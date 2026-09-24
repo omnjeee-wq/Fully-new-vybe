@@ -163,11 +163,7 @@ fun HeroBanner(
                 .fillMaxWidth()
                 .height(360.dp)
         ) {
-                 Box(
-    modifier = Modifier
-        .fillMaxWidth()
-        .height(20.dp)
-        .background(Color.Black)
+                
 )
             // ====================================================
             // 1. BLURRED FULL-WIDTH BACKGROUND
@@ -663,7 +659,7 @@ fun HeroBanner(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(14.dp)
+                .height(20.dp)
                 .background(Color.Black)
         )
     }
