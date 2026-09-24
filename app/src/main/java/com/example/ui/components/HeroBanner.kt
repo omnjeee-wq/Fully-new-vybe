@@ -77,7 +77,6 @@ import com.example.ui.theme.pulsingGlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
-import androidx.compose.foundation.shape.RectangleShape
 
 private val VibrantThemePalette = listOf(
     Color(0xFFFF6436),
@@ -163,9 +162,13 @@ fun HeroBanner(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(360.dp)
-                .clip(RectangleShape)
         ) {
-
+                 Box(
+    modifier = Modifier
+        .fillMaxWidth()
+        .height(20.dp)
+        .background(Color.Black)
+)
             // ====================================================
             // 1. BLURRED FULL-WIDTH BACKGROUND
             // ====================================================
