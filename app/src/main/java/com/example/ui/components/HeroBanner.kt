@@ -659,7 +659,7 @@ fun HeroBanner(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(20.dp)
+                .height(30.dp)
                 .background(Color.Black)
         )
     }
