@@ -75,6 +75,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.domain.smartshuffle.MoodCategory
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.domain.model.Album
@@ -934,13 +935,16 @@ private fun PlaylistsTabContent(
 // 3. LIKED SONGS CONTENT
 // -------------------------------------------------------------
 @Composable
-private fun LikedSongsListContent(
+ private fun LikedSongsListContent(
     songs: List<Song>,
+    selectedMoodFilter: MoodCategory?,
     currentPlayingSongId: String?,
     isPlaying: Boolean,
     onPlaySong: (Song) -> Unit,
     onPlayAll: () -> Unit,
     onShuffle: () -> Unit,
+    onSmartShuffle: (MoodCategory?) -> Unit,
+    onSelectMoodFilter: (MoodCategory?) -> Unit,
     onToggleFavorite: (Song) -> Unit
 ) {
     val context = LocalContext.current
