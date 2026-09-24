@@ -1,0 +1,216 @@
+package com.example.ui.home
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.domain.model.Album
+import com.example.domain.model.HomeSection
+import com.example.domain.model.Playlist
+import com.example.domain.model.SectionItem
+import com.example.domain.model.SectionItemType
+import com.example.domain.model.Song
+import com.example.domain.recommendation.RecommendationEngine
+import com.example.domain.repository.MusicRepository
+import com.example.player.PlayerManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+data class CollectionDetailState(
+    val item: SectionItem,
+    val isLoading: Boolean = true,
+    val songs: List<Song> = emptyList(),
+    val errorMessage: String? = null
+)
+
+data class HomeUiState(
+    val isLoading: Boolean = true,
+    val heroSong: Song? = null,
+    val recommendations: List<Song> = emptyList(),
+    val candidatePool: List<Song> = emptyList(),
+    val sections: List<HomeSection> = emptyList(),
+    val selectedCollection: CollectionDetailState? = null,
+    val errorMessage: String? = null
+)
+
+class HomeViewModel(
+    private val repository: MusicRepository,
+    private val recommendationEngine: RecommendationEngine,
+    private val playerManager: PlayerManager
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(HomeUiState())
+    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    init {
+        loadHomeData()
+        observeHeroRefreshSignal()
+    }
+
+    private fun observeHeroRefreshSignal() {
+        viewModelScope.launch {
+            playerManager.heroRefreshSignal.collect {
+                refreshRecommendationsAndHero()
+            }
+        }
+    }
+
+    fun loadHomeData() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+
+            val candidatesDeferred = async { repository.getRecommendationCandidates() }
+            val sectionsDeferred = async { repository.getHomeSections() }
+
+            val candidates = candidatesDeferred.await()
+            val sectionsResult = sectionsDeferred.await()
+
+            if (sectionsResult.isSuccess || candidates.isNotEmpty()) {
+                val sections = sectionsResult.getOrNull() ?: emptyList()
+                val candidatePool = if (candidates.isNotEmpty()) {
+                    candidates
+                } else {
+                    sections.flatMap { it.songs }.distinctBy { it.id }
+                }
+
+                val hero = recommendationEngine.selectHeroTrack(candidatePool)
+                val recommendations = recommendationEngine.generateRecommendations(candidatePool)
+
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        heroSong = hero,
+                        recommendations = recommendations,
+                        candidatePool = candidatePool,
+                        sections = sections
+                    )
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = sectionsResult.exceptionOrNull()?.localizedMessage ?: "Failed to load music"
+                    )
+                }
+            }
+        }
+    }
+
+    private fun refreshRecommendationsAndHero() {
+        viewModelScope.launch(Dispatchers.Default) {
+            val candidatePool = _uiState.value.candidatePool
+            if (candidatePool.isNotEmpty()) {
+                val newHero = recommendationEngine.selectHeroTrack(candidatePool)
+                val newRecs = recommendationEngine.generateRecommendations(candidatePool)
+                _uiState.update {
+                    it.copy(heroSong = newHero, recommendations = newRecs)
+                }
+            }
+        }
+    }
+
+    fun openCollection(item: SectionItem) {
+        _uiState.update {
+            it.copy(selectedCollection = CollectionDetailState(item = item, isLoading = true))
+        }
+
+        viewModelScope.launch {
+            val result = when (item.type) {
+                SectionItemType.ALBUM -> repository.getAlbumDetails(item.id).map { it.songs }
+                SectionItemType.PLAYLIST, SectionItemType.CHART -> repository.getPlaylistDetails(item.id).map { it.songs }
+            }
+
+            _uiState.update { state ->
+                if (state.selectedCollection?.item?.id == item.id) {
+                    val songs = result.getOrNull() ?: emptyList()
+                    state.copy(
+                        selectedCollection = state.selectedCollection.copy(
+                            isLoading = false,
+                            songs = songs,
+                            errorMessage = if (songs.isEmpty()) result.exceptionOrNull()?.localizedMessage ?: "No tracks found" else null
+                        )
+                    )
+                } else {
+                    state
+                }
+            }
+        }
+    }
+
+    fun closeCollection() {
+        _uiState.update { it.copy(selectedCollection = null) }
+    }
+
+    fun playCollection(item: SectionItem, shuffle: Boolean = false) {
+        viewModelScope.launch {
+            val result = when (item.type) {
+                SectionItemType.ALBUM -> repository.getAlbumDetails(item.id).map { it.songs }
+                SectionItemType.PLAYLIST, SectionItemType.CHART -> repository.getPlaylistDetails(item.id).map { it.songs }
+            }
+            val songs = result.getOrNull() ?: emptyList()
+            if (songs.isNotEmpty()) {
+                val playlist = if (shuffle) songs.shuffled() else songs
+                val firstSong = playlist.first()
+                playerManager.playSong(firstSong, playlist, item.title)
+            }
+        }
+    }
+
+    fun playSong(song: Song, playlist: List<Song> = listOf(song), playlistName: String = "Home") {
+        playerManager.playSong(song, playlist, playlistName)
+    }
+
+    fun toggleHeroPlayPause() {
+        val hero = _uiState.value.heroSong ?: return
+        val currentSong = playerManager.playerState.value.currentSong
+        if (currentSong?.id == hero.id) {
+            playerManager.togglePlayPause()
+        } else {
+            val allSongs = _uiState.value.recommendations.ifEmpty { listOf(hero) }
+            playerManager.playSong(hero, allSongs, "Personalised Vibe")
+        }
+    }
+
+    fun addToQueue(song: Song) {
+        playerManager.addToQueue(song)
+    }
+
+    fun toggleFavorite(song: Song) {
+        viewModelScope.launch {
+            repository.toggleFavorite(song)
+        }
+    }
+
+    fun toggleFavoriteCollection(item: SectionItem) {
+        viewModelScope.launch {
+            when (item.type) {
+                SectionItemType.ALBUM -> {
+                    repository.toggleFavoriteAlbum(
+                        Album(
+                            id = item.id,
+                            title = item.title,
+                            artist = item.subtitle,
+                            artworkUrl = item.artworkUrl,
+                            year = item.year,
+                            songCount = item.songCount
+                        )
+                    )
+                }
+                SectionItemType.PLAYLIST, SectionItemType.CHART -> {
+                    repository.toggleLikedPlaylist(
+                        Playlist(
+                            id = item.id,
+                            title = item.title,
+                            subtitle = item.subtitle,
+                            artworkUrl = item.artworkUrl,
+                            songCount = item.songCount
+                        )
+                    )
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">VYBE</string>
+    <string name="playback_notification_channel_name">Music Playback</string>
+    <string name="playback_notification_channel_desc">Shows active music playback controls and artwork</string>
+</resources>

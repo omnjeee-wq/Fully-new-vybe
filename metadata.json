@@ -1,0 +1,6 @@
+{
+  "name": "VYBE",
+  "description": "A premium cinematic Android music streaming experience with intelligent personalized recommendations, rich Media3 playback, and immersive visual design.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
