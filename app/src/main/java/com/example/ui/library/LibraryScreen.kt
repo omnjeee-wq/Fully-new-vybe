@@ -45,7 +45,6 @@ import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
-import com.example.domain.smartshuffle.MoodCategory
 import com.example.domain.smartshuffle.SmartShuffleEngine
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
