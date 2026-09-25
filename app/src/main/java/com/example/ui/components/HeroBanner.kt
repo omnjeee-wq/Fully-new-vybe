@@ -198,8 +198,8 @@ fun HeroBanner(
     alignment = Alignment.Center,
     modifier = Modifier
         .fillMaxSize()
-        .scale(1.30f)
-        .blur(32.dp)
+        .scale(1.20f)
+        .blur(30.dp)
 )
 
                 // Dark cinematic overlay
@@ -220,10 +220,10 @@ fun HeroBanner(
                     
 Box(
     modifier = Modifier
-        .fillMaxWidth(0.55f)
-        .fillMaxHeight(0.72f)
         .align(Alignment.CenterEnd)
         .padding(end = 20.dp)
+        .width(185.dp)
+        .height(250.dp)
         .clip(RoundedCornerShape(20.dp))
 ) {
 
@@ -238,6 +238,7 @@ Box(
         modifier = Modifier.fillMaxSize()
     )
 }
+
 
                 // ====================================================
                 // FALLBACK BACKGROUND
