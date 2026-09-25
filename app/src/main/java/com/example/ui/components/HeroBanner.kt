@@ -84,6 +84,7 @@ import kotlin.math.abs
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import com.example.R
+import androidx.compose.ui.draw.clipToBounds
 
 private val GreatVibesFontFamily = FontFamily(
     Font(
@@ -176,6 +177,7 @@ fun HeroBanner(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(360.dp)
+                .clipToBounds()
         ) {
                 
 
