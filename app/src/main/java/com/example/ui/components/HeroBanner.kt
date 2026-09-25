@@ -191,6 +191,7 @@ fun HeroBanner(
     model = ImageRequest.Builder(context)
         .data(heroSong.artworkUrl)
         .crossfade(true)
+        .size(512, 512)
         .build(),
     contentDescription = null,
     contentScale = ContentScale.Crop,
@@ -238,7 +239,7 @@ Box(
     )
 }
 
-
+        } else {
                 // ====================================================
                 // FALLBACK BACKGROUND
                 // ====================================================
