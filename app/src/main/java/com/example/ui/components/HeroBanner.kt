@@ -190,7 +190,6 @@ fun HeroBanner(
                 AsyncImage(
     model = ImageRequest.Builder(context)
         .data(heroSong.artworkUrl)
-        .size(512, 512)
         .crossfade(true)
         .build(),
     contentDescription = null,
