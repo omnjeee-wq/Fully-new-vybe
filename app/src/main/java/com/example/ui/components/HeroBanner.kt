@@ -3,6 +3,7 @@ package com.example.ui.components
 import android.content.Context
 import androidx.compose.foundation.shape.RoundedCornerShape
 import android.content.Intent
+import androidx.compose.foundation.layout.offset
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
