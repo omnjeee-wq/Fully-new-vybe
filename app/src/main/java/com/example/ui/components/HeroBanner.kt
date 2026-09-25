@@ -506,7 +506,7 @@ fun HeroBanner(
     Text(
         text = "Vibe",
         color = animatedThemeColor,
-        fontSize = 48.sp,
+        fontSize = 51.sp,
         fontFamily = GreatVibesFontFamily,
         fontWeight = FontWeight.Normal,
         style = TextStyle(
