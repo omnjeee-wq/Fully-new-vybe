@@ -58,6 +58,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.Coil
@@ -80,6 +82,13 @@ import kotlin.math.abs
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import com.example.R
+
+private val GreatVibesFontFamily = FontFamily(
+    Font(
+        resId = R.font.great_vibes,
+        weight = FontWeight.Normal
+    )
+)
 
 private val VibrantThemePalette = listOf(
     Color(0xFFFF6436),
@@ -482,56 +491,46 @@ fun HeroBanner(
                     )
 
                     Row(
-                        verticalAlignment =
-                            Alignment.CenterVertically
-                    ) {
+    verticalAlignment = Alignment.CenterVertically
+) {
+    Text(
+        text = "Your",
+        color = Color.White,
+        fontSize = 42.sp,
+        fontFamily = PlayfairFontFamily,
+        fontWeight = FontWeight.Bold
+    )
 
-                        Text(
-                            text = "Your ",
-                            color = Color.White,
-                            fontSize = 32.sp,
-                            fontFamily = OutfitFontFamily,
-                            fontWeight =
-                                FontWeight.ExtraBold
-                        )
+    Spacer(modifier = Modifier.width(6.dp))
 
-                        Text(
-                            text = "Vibe",
-                            color = animatedThemeColor,
-                            fontSize = 36.sp,
-                            fontStyle = FontStyle.Italic,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily =
-                                PlayfairFontFamily,
-                            style = TextStyle(
-                                shadow = Shadow(
-                                    color =
-                                        animatedThemeColor.copy(
-                                            alpha = 0.8f
-                                        ),
-                                    blurRadius = 24f
-                                )
-                            )
-                        )
+    Text(
+        text = "Vibe",
+        color = animatedThemeColor,
+        fontSize = 48.sp,
+        fontFamily = GreatVibesFontFamily,
+        fontWeight = FontWeight.Normal,
+        style = TextStyle(
+            shadow = Shadow(
+                color = animatedThemeColor.copy(alpha = 0.8f),
+                blurRadius = 24f
+            )
+        )
+    )
 
-                        Spacer(
-                            modifier = Modifier.width(8.dp)
-                        )
+    Spacer(modifier = Modifier.width(8.dp))
 
-                        Icon(
-                            imageVector =
-                                Icons.Default.Headphones,
-                            contentDescription = null,
-                            tint = animatedThemeColor,
-                            modifier = Modifier
-                                .size(22.dp)
-                                .neonGlow(
-                                    color =
-                                        animatedThemeColor,
-                                    radius = 8.dp,
-                                    alpha = 0.5f
-                                )
-                        )
+    Icon(
+        imageVector = Icons.Default.Headphones,
+        contentDescription = null,
+        tint = animatedThemeColor,
+        modifier = Modifier
+            .size(22.dp)
+            .neonGlow(
+                color = animatedThemeColor,
+                radius = 8.dp,
+                alpha = 0.5f
+            )
+    )
                     }
 
                     Spacer(
