@@ -1,6 +1,7 @@
 package com.example.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,12 +53,14 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val playerState by playerManager.playerState.collectAsStateWithLifecycle()
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(VybeBlack)
-            .testTag("home_screen")
-    ) {
+      Box(
+    modifier = modifier
+        .fillMaxSize()
+        .background(Color.Black)
+        .statusBarsPadding()
+        .testTag("home_screen")
+) { 
+    
         // Atmospheric subtle background gradient
         Box(
             modifier = Modifier
