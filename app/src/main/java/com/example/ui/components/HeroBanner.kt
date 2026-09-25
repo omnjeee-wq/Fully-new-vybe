@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import android.content.Context
+import androidx.compose.foundation.shape.RoundedCornerShape
 import android.content.Intent
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.animation.AnimatedContent
@@ -216,7 +217,8 @@ fun HeroBanner(
                 // 2. SHARP ARTWORK — RIGHT SIDE
                 // ====================================================
 
-                Box(
+                    
+Box(
     modifier = Modifier
         .fillMaxWidth(0.55f)
         .fillMaxHeight(0.72f)
@@ -225,21 +227,17 @@ fun HeroBanner(
         .clip(RoundedCornerShape(20.dp))
 ) {
 
-                    AsyncImage(
-    model = ImageRequest.Builder(context)
-        .data(heroSong.artworkUrl)
-        .crossfade(true)
-        .build(),
-    contentDescription = heroSong.title,
-    contentScale = ContentScale.Crop,
-    alignment = Alignment.Center,
-    modifier = Modifier.fillMaxSize()
-)
-                            
-                    )
-                }
-
-            } else {
+    AsyncImage(
+        model = ImageRequest.Builder(context)
+            .data(heroSong.artworkUrl)
+            .crossfade(true)
+            .build(),
+        contentDescription = heroSong.title,
+        contentScale = ContentScale.Crop,
+        alignment = Alignment.Center,
+        modifier = Modifier.fillMaxSize()
+    )
+}
 
                 // ====================================================
                 // FALLBACK BACKGROUND
