@@ -198,7 +198,7 @@ fun HeroBanner(
                     modifier = Modifier
                         .fillMaxSize()
                         .scale(1.20f)
-                        .blur(28.dp)
+                        .blur(30.dp)
                 )
 
                 // Dark cinematic overlay
@@ -219,7 +219,7 @@ fun HeroBanner(
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .fillMaxWidth(0.68f)
+                        .fillMaxWidth(0.67f)
                         .align(Alignment.CenterEnd)
                 ) {
 
@@ -327,7 +327,7 @@ fun HeroBanner(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(70.dp)
+                    .height(75.dp)
                     .align(Alignment.BottomCenter)
                     .background(
                         Brush.verticalGradient(
@@ -414,14 +414,14 @@ fun HeroBanner(
     painter = painterResource(id = R.drawable.vybe_logo),
     contentDescription = "VYBE Logo",
     contentScale = ContentScale.Fit,
-    modifier = Modifier.size(42.dp)
+    modifier = Modifier.size(45.dp)
 )
                         }
 
                         Text(
     text = "VYBE",
     color = Color.White,
-    fontSize = 25.sp,
+    fontSize = 27.sp,
     fontWeight = FontWeight.ExtraBold,
     fontFamily = OutfitFontFamily,
     letterSpacing = 1.5.sp
@@ -480,14 +480,14 @@ fun HeroBanner(
                         color = Color.White.copy(
                             alpha = 0.85f
                         ),
-                        fontSize = 12.sp,
+                        fontSize = 15.sp,
                         fontFamily = OutfitFontFamily,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 3.5.sp
                     )
 
                     Spacer(
-                        modifier = Modifier.height(3.dp)
+                        modifier = Modifier.height(4.dp)
                     )
 
                     Row(
@@ -661,7 +661,7 @@ fun HeroBanner(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(42.dp)
+                .height(44.dp)
                 .background(Color.Black)
         )
     }
