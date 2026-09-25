@@ -235,30 +235,7 @@ fun HeroBanner(
     alignment = Alignment.Center,
     modifier = Modifier.fillMaxSize()
 )
-                            .drawWithContent {
-
-                                drawContent()
-
-                                /*
-                                 * Smoothly dissolves the sharp
-                                 * artwork into the blurred artwork.
-                                 *
-                                 * This prevents a visible
-                                 * vertical split.
-                                 */
-                                drawRect(
-                                    brush = Brush.horizontalGradient(
-                                        0.0f to Color.Transparent,
-                                        0.12f to Color.Transparent,
-                                        0.30f to Color.Black.copy(
-                                            alpha = 0.25f
-                                        ),
-                                        0.48f to Color.Black,
-                                        1.0f to Color.Black
-                                    ),
-                                    blendMode = BlendMode.DstIn
-                                )
-                            }
+                            
                     )
                 }
 
