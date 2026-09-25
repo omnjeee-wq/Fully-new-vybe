@@ -199,6 +199,7 @@ fun HeroBanner(
     modifier = Modifier
         .fillMaxSize()
         .scale(1.20f)
+      .offset(y = 30.dp)
         .blur(30.dp)
 )
 
@@ -233,7 +234,7 @@ Box(
             .crossfade(true)
             .build(),
         contentDescription = heroSong.title,
-        contentScale = ContentScale.Crop,
+        contentScale = ContentScale.Fit,
         alignment = Alignment.Center,
         modifier = Modifier.fillMaxSize()
     )
@@ -519,6 +520,7 @@ Box(
                             alpha = 0.75f
                         ),
                         fontSize = 11.sp,
+                     .fillMaxWidth(0.62f),
                         fontFamily = OutfitFontFamily,
                         fontWeight =
                             FontWeight.SemiBold,
