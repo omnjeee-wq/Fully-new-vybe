@@ -187,19 +187,19 @@ fun HeroBanner(
             ) {
 
                 AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(heroSong.artworkUrl)
-                        .size(256, 256)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    alignment = Alignment.Center,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .scale(1.20f)
-                        .blur(30.dp)
-                )
+    model = ImageRequest.Builder(context)
+        .data(heroSong.artworkUrl)
+        .size(512, 512)
+        .crossfade(true)
+        .build(),
+    contentDescription = null,
+    contentScale = ContentScale.Crop,
+    alignment = Alignment.Center,
+    modifier = Modifier
+        .fillMaxSize()
+        .scale(1.30f)
+        .blur(32.dp)
+)
 
                 // Dark cinematic overlay
                 Box(
@@ -217,26 +217,24 @@ fun HeroBanner(
                 // ====================================================
 
                 Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(0.67f)
-                        .align(Alignment.CenterEnd)
-                ) {
+    modifier = Modifier
+        .fillMaxWidth(0.55f)
+        .fillMaxHeight(0.72f)
+        .align(Alignment.CenterEnd)
+        .padding(end = 20.dp)
+        .clip(RoundedCornerShape(20.dp))
+) {
 
                     AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(heroSong.artworkUrl)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = heroSong.title,
-                        contentScale = ContentScale.Crop,
-                        alignment = Alignment.Center,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                compositingStrategy =
-                                    CompositingStrategy.Offscreen
-                            }
+    model = ImageRequest.Builder(context)
+        .data(heroSong.artworkUrl)
+        .crossfade(true)
+        .build(),
+    contentDescription = heroSong.title,
+    contentScale = ContentScale.Crop,
+    alignment = Alignment.Center,
+    modifier = Modifier.fillMaxSize()
+)
                             .drawWithContent {
 
                                 drawContent()
