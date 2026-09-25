@@ -447,6 +447,7 @@ Box(
                 Column(
                     modifier = Modifier.padding(
                         bottom = 6.dp
+                        .fillMaxWidth(0.62f),
                     )
                 ) {
 
@@ -520,7 +521,6 @@ Box(
                             alpha = 0.75f
                         ),
                         fontSize = 11.sp,
-                     .fillMaxWidth(0.62f),
                         fontFamily = OutfitFontFamily,
                         fontWeight =
                             FontWeight.SemiBold,
