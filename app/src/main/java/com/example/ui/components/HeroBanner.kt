@@ -446,11 +446,10 @@ Box(
                 // ====================================================
 
                 Column(
-                    modifier = Modifier.padding(
-                        bottom = 6.dp
-                        .fillMaxWidth(0.62f),
-                    )
-                ) {
+    modifier = Modifier
+        .padding(bottom = 6.dp)
+        .fillMaxWidth(0.62f)
+) {
 
                     Text(
                         text = "MADE FOR",
