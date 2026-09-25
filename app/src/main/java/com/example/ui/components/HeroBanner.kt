@@ -77,6 +77,9 @@ import com.example.ui.theme.pulsingGlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.example.R
 
 private val VibrantThemePalette = listOf(
     Color(0xFFFF6436),
@@ -398,22 +401,22 @@ fun HeroBanner(
                                 Alignment.Center
                         ) {
 
-                            Text(
-                                text = "♪",
-                                color = Color.White,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                        Image(
+    painter = painterResource(id = R.drawable.vybe_logo),
+    contentDescription = "VYBE Logo",
+    contentScale = ContentScale.Fit,
+    modifier = Modifier.size(42.dp)
+)
                         }
 
                         Text(
-                            text = "VYBE",
-                            color = VybeTextPrimary,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = OutfitFontFamily,
-                            letterSpacing = 2.5.sp
-                        )
+    text = "VYBE",
+    color = Color.White,
+    fontSize = 25.sp,
+    fontWeight = FontWeight.ExtraBold,
+    fontFamily = OutfitFontFamily,
+    letterSpacing = 1.5.sp
+)
                     }
 
                     // =================================================
