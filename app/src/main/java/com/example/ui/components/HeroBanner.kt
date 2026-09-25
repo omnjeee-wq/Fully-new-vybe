@@ -199,8 +199,8 @@ fun HeroBanner(
     alignment = Alignment.Center,
     modifier = Modifier
         .fillMaxSize()
-        .scale(1.20f)
-      .offset(y = 30.dp)
+        .scale(2.20f)
+      .offset(y = 3.dp)
         .blur(30.dp)
 )
 
