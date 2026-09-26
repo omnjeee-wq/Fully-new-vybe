@@ -46,23 +46,22 @@ class RecommendationEngine(
      * Scores and ranks candidates for "Recommend For You" section.
      */
     suspend fun generateRecommendations(candidatePool: List<Song>, limit: Int = 12): List<Song> = withContext(Dispatchers.IO) {
-        if (candidatePool.isEmpty()) return@withContext emptyList()
+    if (candidatePool.isEmpty()) return@withContext emptyList()
 
-        val history = songDao.getRecentHistory(50)
-        if (history.isEmpty()) {
-            // Cold start: return diverse selection
-            return@withContext applyControlledDiversity(candidatePool, limit = limit)
-        }
-
-        val scored = candidatePool.map { song ->
-            val score = calculateRecommendationScore(song, history)
-            song to score
-        }.sortedByDescending { it.second }
+    val history = songDao.getRecentHistory(50)
+    val basePool = if (history.isEmpty()) {
+        candidatePool.shuffled()
+    } else {
+        val scored = candidatePool.map { song -> song to calculateRecommendationScore(song, history) }
+            .sortedByDescending { it.second }
             .map { it.first }
-
-        applyControlledDiversity(scored, limit = limit)
+        val topSlice = scored.take((limit * 2.5).toInt().coerceAtLeast(limit))
+        topSlice.shuffled()
     }
 
+    applyControlledDiversity(basePool, limit = limit)
+    }
+    
     private fun calculateRecommendationScore(song: Song, history: List<SongHistoryEntity>): Double {
         var score = 0.0
 
