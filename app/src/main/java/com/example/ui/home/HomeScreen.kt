@@ -148,7 +148,7 @@ fun HomeScreen(
                         currentPlayingSongId = playerState.currentSong?.id,
                         isPlaying = playerState.isPlaying,
                         onSongClick = { song ->
-                            viewModel.playSong(song, uiState.recommendations, "Recommend For You")
+                            viewModel.playSongWithRadio(song, uiState.recommendations, "Recommend For You")
                         },
                         onAddToQueue = { song ->
                             viewModel.addToQueue(song)
