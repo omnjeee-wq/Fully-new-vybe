@@ -235,6 +235,16 @@ class MusicRepositoryImpl(
         }
     }
 
+    override suspend fun getRadioQueue(songId: String, limit: Int): Result<List<Song>> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getSongSuggestions(id = songId, limit = limit)
+            val songs = response.data?.map { MusicUtils.toDomainSong(it) } ?: emptyList()
+            Result.success(songs)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     override suspend fun searchAlbums(query: String, limit: Int): Result<List<Album>> = withContext(Dispatchers.IO) {
         try {
             val response = apiService.searchAlbums(query = query, limit = limit)
