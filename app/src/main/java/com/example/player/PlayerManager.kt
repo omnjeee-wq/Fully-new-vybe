@@ -48,6 +48,9 @@ class PlayerManager private constructor(
     val playerState: StateFlow<PlayerState> = _playerState.asStateFlow()
 
     private val _heroRefreshSignal = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    private val _recsRefreshSignal = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val recsRefreshSignal: SharedFlow<Unit> = _recsRefreshSignal.asSharedFlow()
+    private var recsPlayCounter = 0
     val heroRefreshSignal: SharedFlow<Unit> = _heroRefreshSignal.asSharedFlow()
 
     private var progressJob: Job? = null
@@ -484,6 +487,21 @@ class PlayerManager private constructor(
         }
     }
 
+     fun replaceUpcomingQueue(currentSong: Song, newQueue: List<Song>) {
+        executeWithController { ctrl ->
+            val state = _playerState.value
+            if (state.currentSong?.id != currentSong.id) return@executeWithController
+            val idx = ctrl.currentMediaItemIndex
+            val itemCount = ctrl.mediaItemCount
+            if (itemCount > idx + 1) ctrl.removeMediaItems(idx + 1, itemCount)
+            val upcoming = newQueue.filterNot { it.id == currentSong.id }
+            if (upcoming.isNotEmpty()) ctrl.addMediaItems(upcoming.map { it.toMediaItem() })
+            val updatedQueue = state.queue.take(idx + 1) + upcoming
+            _playerState.update { it.copy(queue = updatedQueue) }
+            persistCurrentState()
+        }
+     }
+
     fun addToQueue(song: Song) {
         val updatedQueue = _playerState.value.queue + song
         _playerState.update { it.copy(queue = updatedQueue) }
@@ -558,7 +576,12 @@ class PlayerManager private constructor(
         next()
     }
 
-    private fun onQualifyingPlayCounted(song: Song) {
+   private fun onQualifyingPlayCounted(song: Song) {
+        recsPlayCounter++
+        if (recsPlayCounter >= 3) {
+            recsPlayCounter = 0
+            scope.launch { _recsRefreshSignal.emit(Unit) }
+        }
         scope.launch(Dispatchers.IO) {
             val newCount = repository.incrementQualifyingPlayCount()
             if (newCount >= 5) {
@@ -566,7 +589,7 @@ class PlayerManager private constructor(
                 _heroRefreshSignal.emit(Unit)
             }
         }
-    }
+   } 
 
     private fun persistCurrentState() {
         val state = _playerState.value
