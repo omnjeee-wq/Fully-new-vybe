@@ -48,6 +48,21 @@ class HomeViewModel(
     init {
         loadHomeData()
         observeHeroRefreshSignal()
+        observeRecsRefreshSignal()
+    }
+
+    private fun observeRecsRefreshSignal() {
+        viewModelScope.launch {
+            playerManager.recsRefreshSignal.collect {
+                viewModelScope.launch(Dispatchers.Default) {
+                    val candidatePool = _uiState.value.candidatePool
+                    if (candidatePool.isNotEmpty()) {
+                        val newRecs = recommendationEngine.generateRecommendations(candidatePool)
+                        _uiState.update { it.copy(recommendations = newRecs) }
+                    }
+                }
+            }
+        }
     }
 
     private fun observeHeroRefreshSignal() {
