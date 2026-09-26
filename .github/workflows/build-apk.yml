@@ -38,7 +38,7 @@ jobs:
             -keypass android \
             -dname "CN=Android Debug,O=Android,C=US"
 
-                  - name: Get SHA-1
+      - name: Get SHA-1
         run: |
           keytool -list -v \
             -keystore debug.keystore \
