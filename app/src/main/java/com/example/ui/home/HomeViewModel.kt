@@ -178,6 +178,18 @@ class HomeViewModel(
         playerManager.playSong(song, playlist, playlistName)
     }
 
+    fun playSongWithRadio(song: Song, fallbackPlaylist: List<Song>, playlistName: String) {
+    playerManager.playSong(song, fallbackPlaylist, playlistName)
+    viewModelScope.launch {
+        repository.getRadioQueue(song.id).onSuccess { radioSongs ->
+            if (radioSongs.isNotEmpty()) {
+                val fullQueue = listOf(song) + radioSongs.filterNot { it.id == song.id }
+                playerManager.replaceUpcomingQueue(currentSong = song, newQueue = fullQueue)
+            }
+        }
+    }
+    }
+
     fun toggleHeroPlayPause() {
         val hero = _uiState.value.heroSong ?: return
         val currentSong = playerManager.playerState.value.currentSong
