@@ -98,6 +98,23 @@ class SearchViewModel(
         _uiState.value = SearchUiState.Idle
     }
 
+     fun playSongWithRadio(
+        song: Song,
+        playerManager: PlayerManager,
+        fallbackPlaylist: List<Song>,
+        playlistName: String
+    ) {
+        playerManager.playSong(song = song, playlist = fallbackPlaylist, playlistName = playlistName)
+        viewModelScope.launch {
+            repository.getRadioQueue(song.id).onSuccess { radioSongs ->
+                if (radioSongs.isNotEmpty()) {
+                    val fullQueue = listOf(song) + radioSongs.filterNot { it.id == song.id }
+                    playerManager.replaceUpcomingQueue(currentSong = song, newQueue = fullQueue)
+                }
+            }
+        }
+     }
+     
     fun toggleFavorite(song: Song) {
         viewModelScope.launch {
             val newLiked = repository.toggleFavorite(song)
