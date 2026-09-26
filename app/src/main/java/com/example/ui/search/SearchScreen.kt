@@ -133,21 +133,23 @@ fun SearchScreen(
                     currentSongId = playerState.currentSong?.id,
                     isPlaying = playerState.isPlaying,
                     onSongClick = { song ->
-                        playerManager.playSong(
-                            song = song,
-                            playlist = state.songs,
+                    viewModel.playSongWithRadio(
+                        song = song,
+                        playerManager = playerManager,
+                        fallbackPlaylist = state.songs,
+                        playlistName = "Search: ${state.query}"
+                    )
+                },
+                onPlayAll = {
+                    if (state.songs.isNotEmpty()) {
+                        viewModel.playSongWithRadio(
+                            song = state.songs.first(),
+                            playerManager = playerManager,
+                            fallbackPlaylist = state.songs,
                             playlistName = "Search: ${state.query}"
                         )
-                    },
-                    onPlayAll = {
-                        if (state.songs.isNotEmpty()) {
-                            playerManager.playSong(
-                                song = state.songs.first(),
-                                playlist = state.songs,
-                                playlistName = "Search: ${state.query}"
-                            )
-                        }
-                    },
+                    }
+                },
                     onToggleFavorite = { song ->
                         viewModel.toggleFavorite(song)
                     }
