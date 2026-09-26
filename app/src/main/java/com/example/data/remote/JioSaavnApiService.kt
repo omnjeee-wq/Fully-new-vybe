@@ -60,4 +60,10 @@ interface JioSaavnApiService {
         @Query("songCount") songCount: Int = 20,
         @Query("albumCount") albumCount: Int = 10
     ): ApiResponse<ApiArtistDetails>
+
+    @GET("api/songs/{id}/suggestions")
+    suspend fun getSongSuggestions(
+        @Path("id") id: String,
+        @Query("limit") limit: Int = 10
+    ): ApiResponse<List<ApiSong>>
 }
