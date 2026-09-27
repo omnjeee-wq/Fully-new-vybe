@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <!-- Normal app theme -->
     <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar">
         <item name="android:windowBackground">#09090C</item>
         <item name="android:colorBackground">#09090C</item>
+    </style>
 
-        <!-- Splash Screen -->
+    <!-- Startup / Splash theme -->
+    <style name="Theme.MyApplication.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">#09090C</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/vybe_splash</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/vybe_logo</item>
         <item name="postSplashScreenTheme">@style/Theme.MyApplication</item>
     </style>
 
