@@ -116,6 +116,11 @@ import com.example.ui.theme.VybeTextPrimary
 import com.example.ui.theme.VybeTextSecondary
 import com.example.util.MusicUtils
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.URL
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -128,11 +133,75 @@ fun PlayerScreen(
     val context = LocalContext.current
     val playerState by playerManager.playerState.collectAsStateWithLifecycle()
     val currentSong = playerState.currentSong
+    LaunchedEffect(currentSong?.id) {
+
+    val songId = currentSong?.id ?: return@LaunchedEffect
+
+    lyricsLoading = true
+    lyricsError = null
+    lyricsText = null
+
+    try {
+        val result = withContext(Dispatchers.IO) {
+
+            val url = URL(
+                "https://vybe.vyoma-apps.workers.dev/api/songs/{SONG_ID}/lyrics"
+            )
+
+            val connection = url.openConnection()
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 10_000
+
+            val response = connection
+                .getInputStream()
+                .bufferedReader()
+                .use { it.readText() }
+
+            val json = JSONObject(response)
+
+            if (!json.optBoolean("success")) {
+                throw Exception("Lyrics not available")
+            }
+
+            val data = json.opt("data")
+
+            when (data) {
+
+                is JSONObject -> {
+                    data.optString("lyrics")
+                }
+
+                is String -> {
+                    data
+                }
+
+                else -> {
+                    ""
+                }
+            }
+        }
+
+        lyricsText = result.ifBlank {
+            "Lyrics are not available for this song."
+        }
+
+    } catch (e: Exception) {
+
+        lyricsError = "Unable to load lyrics"
+
+    } finally {
+
+        lyricsLoading = false
+    }
+    }
 
     var showQueueSheet by remember { mutableStateOf(false) }
     var showLyricsSheet by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showAddToPlaylistSheet by remember { mutableStateOf(false) }
+    var lyricsText by remember { mutableStateOf<String?>(null) }
+var lyricsLoading by remember { mutableStateOf(false) }
+var lyricsError by remember { mutableStateOf<String?>(null) }
 
     val isDownloaded by (currentSong?.let { VybeApp.instance.repository.isSongDownloaded(it.id) } ?: flowOf(false))
         .collectAsStateWithLifecycle(false)
@@ -720,14 +789,56 @@ fun PlayerScreen(
                     )
 
                     Spacer(modifier = Modifier.height(32.dp))
+                    
 
-                    Text(
-                        text = "♪ Lyrics sync is currently in preview.\nEnjoy the pure melody and rhythm of this track.",
-                        color = VybeTextMuted,
-                        fontSize = 15.sp,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 24.sp
-                    )
+             LazyColumn(
+    modifier = Modifier
+        .fillMaxWidth()
+        .weight(1f),
+    horizontalAlignment = Alignment.CenterHorizontally
+) {
+    item {
+                    when {
+
+    lyricsLoading -> {
+
+        CircularProgressIndicator(
+            color = VybeOrange,
+            modifier = Modifier.size(32.dp)
+        )
+    }
+
+    lyricsError != null -> {
+
+        Text(
+            text = lyricsError ?: "Lyrics unavailable",
+            color = VybeTextMuted,
+            fontSize = 15.sp,
+            textAlign = TextAlign.Center
+        )
+    }
+
+    !lyricsText.isNullOrBlank() -> {
+
+        Text(
+            text = lyricsText!!,
+            color = VybeTextPrimary,
+            fontSize = 16.sp,
+            lineHeight = 26.sp,
+            textAlign = TextAlign.Center
+        )
+    }
+
+    else -> {
+
+        Text(
+            text = "Lyrics are not available for this song.",
+            color = VybeTextMuted,
+            fontSize = 15.sp,
+            textAlign = TextAlign.Center
+        )
+    }
+                    }
 
                     Spacer(modifier = Modifier.height(32.dp))
                 }
