@@ -106,14 +106,35 @@ class SearchViewModel(
     fallbackPlaylist: List<Song>,
     playlistName: String
 ) {
-    val searchQueue = fallbackPlaylist
-        .distinctBy { it.id }
-
+    // First play the selected song immediately
     playerManager.playSong(
         song = song,
-        playlist = searchQueue,
+        playlist = listOf(song),
         playlistName = playlistName
     )
+
+    viewModelScope.launch {
+        repository.getRadioQueue(song.id, limit = 20).onSuccess { radioSongs ->
+
+            // IDs of songs already visible in search results
+            val searchResultIds = fallbackPlaylist
+                .map { it.id }
+                .toSet()
+
+            // Keep only genuinely different songs
+            val recommendations = radioSongs
+                .filter { it.id != song.id }
+                .filterNot { it.id in searchResultIds }
+                .distinctBy { it.id }
+
+            if (recommendations.isNotEmpty()) {
+                playerManager.replaceUpcomingQueue(
+                    currentSong = song,
+                    newQueue = recommendations
+                )
+            }
+        }
+    }
      }
      
     fun toggleFavorite(song: Song) {
