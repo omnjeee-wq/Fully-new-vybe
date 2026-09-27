@@ -99,17 +99,19 @@ class SearchViewModel(
         _uiState.value = SearchUiState.Idle
     }
 
+     
      fun playSongWithRadio(
     song: Song,
     playerManager: PlayerManager,
     fallbackPlaylist: List<Song>,
     playlistName: String
 ) {
-    val fullQueue = listOf(song) + fallbackPlaylist.filterNot { it.id == song.id }
+    val searchQueue = fallbackPlaylist
+        .distinctBy { it.id }
 
     playerManager.playSong(
         song = song,
-        playlist = fullQueue,
+        playlist = searchQueue,
         playlistName = playlistName
     )
      }
