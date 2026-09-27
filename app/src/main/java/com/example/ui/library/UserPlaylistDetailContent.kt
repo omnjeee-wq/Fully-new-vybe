@@ -63,6 +63,10 @@ import com.example.ui.theme.VybeTextMuted
 import com.example.ui.theme.VybeTextPrimary
 import com.example.ui.theme.VybeTextSecondary
 import com.example.util.MusicUtils
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 
 @Composable
 fun UserPlaylistDetailContent(
@@ -84,6 +88,7 @@ fun UserPlaylistDetailContent(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .statusBarsPadding()       
             .background(VybeSurface)
             .testTag("user_playlist_detail_screen")
     ) {
@@ -127,7 +132,9 @@ fun UserPlaylistDetailContent(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 140.dp)
+            contentPadding = PaddingValues(
+    bottom = 140.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+)
         ) {
             // Header Art and Details
             item(key = "playlist_header") {
