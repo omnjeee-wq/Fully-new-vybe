@@ -105,20 +105,13 @@ class SearchViewModel(
     fallbackPlaylist: List<Song>,
     playlistName: String
 ) {
-    // Sirf isi song ke saath turant play karo — poori search list nahi, taaki duplicate na dikhe
-    playerManager.playSong(song = song, playlist = listOf(song), playlistName = playlistName)
+    val fullQueue = listOf(song) + fallbackPlaylist.filterNot { it.id == song.id }
 
-    viewModelScope.launch {
-        val result = repository.getRadioQueue(song.id)
-        val radioSongs = result.getOrNull().orEmpty()
-        val fullQueue = if (radioSongs.isNotEmpty()) {
-            listOf(song) + radioSongs.filterNot { it.id == song.id }
-        } else {
-            // Suggestions fail/empty ho to hi purani list fallback ke roop mein use karo
-            listOf(song) + fallbackPlaylist.filterNot { it.id == song.id }
-        }
-        playerManager.replaceUpcomingQueue(currentSong = song, newQueue = fullQueue)
-    }
+    playerManager.playSong(
+        song = song,
+        playlist = fullQueue,
+        playlistName = playlistName
+    )
      }
      
     fun toggleFavorite(song: Song) {
