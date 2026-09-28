@@ -2,13 +2,38 @@ package com.example.ui.player
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import com.example.ui.theme.GlowOrange
+import com.example.ui.theme.GlowPink
+import com.example.ui.theme.OutfitFontFamily
+import com.example.ui.theme.neonGlow
+import com.example.ui.theme.pulsingGlow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -16,11 +41,42 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.Lyrics
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import com.example.VybeApp
+import kotlinx.coroutines.flow.flowOf
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -42,14 +98,22 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.VybeApp
 import com.example.domain.model.Song
 import com.example.player.PlayerManager
 import com.example.ui.components.EqualizerWaveformIndicator
-import com.example.ui.theme.*
+import com.example.ui.theme.VybeBlack
+import com.example.ui.theme.VybeCoral
+import com.example.ui.theme.VybeElectricCyan
+import com.example.ui.theme.VybeNearBlack
+import com.example.ui.theme.VybeOrange
+import com.example.ui.theme.VybePink
+import com.example.ui.theme.VybeSurface
+import com.example.ui.theme.VybeSurfaceVariant
+import com.example.ui.theme.VybeTextMuted
+import com.example.ui.theme.VybeTextPrimary
+import com.example.ui.theme.VybeTextSecondary
 import com.example.util.MusicUtils
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -73,14 +137,15 @@ fun PlayerScreen(
     var showMenu by remember { mutableStateOf(false) }
     var showAddToPlaylistSheet by remember { mutableStateOf(false) }
 
-    // Lyrics state MUST be declared before LaunchedEffect.
+    // Lyrics state MUST be declared before the LaunchedEffect that uses it.
     var lyricsText by remember { mutableStateOf<String?>(null) }
     var lyricsLoading by remember { mutableStateOf(false) }
     var lyricsError by remember { mutableStateOf<String?>(null) }
 
-    // Fetch lyrics whenever the current song changes.
+    // Fetch lyrics whenever the currently playing song changes.
     LaunchedEffect(currentSong?.id) {
         val songId = currentSong?.id
+
         if (songId.isNullOrBlank()) {
             lyricsText = null
             lyricsError = null
@@ -94,8 +159,11 @@ fun PlayerScreen(
 
         try {
             val result = withContext(Dispatchers.IO) {
-                val encodedSongId = java.net.URLEncoder.encode(songId, "UTF-8")
-                val url = URL("https://vybe.vyoma-apps.workers.dev/api/songs/$encodedSongId/lyrics")
+                val encodedSongId = Uri.encode(songId)
+                val url = URL(
+                    "https://vybe.vyoma-apps.workers.dev/api/songs/$encodedSongId/lyrics"
+                )
+
                 val connection = (url.openConnection() as HttpURLConnection).apply {
                     requestMethod = "GET"
                     connectTimeout = 10_000
@@ -105,34 +173,58 @@ fun PlayerScreen(
 
                 try {
                     val responseCode = connection.responseCode
-                    val stream = if (responseCode in 200..299) {
-                        connection.inputStream
+
+                    val response = if (responseCode in 200..299) {
+                        connection.inputStream.bufferedReader().use { it.readText() }
                     } else {
-                        connection.errorStream
+                        val errorBody = connection.errorStream
+                            ?.bufferedReader()
+                            ?.use { it.readText() }
+
+                        throw Exception(
+                            if (!errorBody.isNullOrBlank()) {
+                                "Lyrics request failed: HTTP $responseCode"
+                            } else {
+                                "Lyrics request failed: HTTP $responseCode"
+                            }
+                        )
                     }
 
-                    val response = stream?.bufferedReader()?.use { it.readText() }
-                        ?: throw Exception("HTTP $responseCode")
-
                     val json = JSONObject(response)
+
                     if (!json.optBoolean("success", false)) {
                         throw Exception("Lyrics not available")
                     }
 
                     val data = json.opt("data")
+
                     when (data) {
-                        is JSONObject -> data.optString("lyrics").trim()
-                        is String -> data.trim()
-                        else -> ""
+                        is JSONObject -> {
+                            data.optString(
+                                "lyrics",
+                                data.optString("text", "")
+                            )
+                        }
+
+                        is String -> {
+                            data
+                        }
+
+                        else -> {
+                            ""
+                        }
                     }
                 } finally {
                     connection.disconnect()
                 }
             }
 
-            lyricsText = result.ifBlank { null }
-            if (lyricsText == null) {
+            if (result.isBlank()) {
+                lyricsText = null
                 lyricsError = "Lyrics are not available for this song."
+            } else {
+                lyricsText = result
+                lyricsError = null
             }
         } catch (e: Exception) {
             lyricsText = null
@@ -145,7 +237,7 @@ fun PlayerScreen(
     val isDownloaded by (
         currentSong?.let { VybeApp.instance.repository.isSongDownloaded(it.id) }
             ?: flowOf(false)
-    ).collectAsStateWithLifecycle(false)
+        ).collectAsStateWithLifecycle(false)
 
     val userPlaylists by VybeApp.instance.repository.getUserPlaylists()
         .collectAsStateWithLifecycle(emptyList())
@@ -153,6 +245,7 @@ fun PlayerScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
+    // Slider dragging state
     var isSeeking by remember { mutableStateOf(false) }
     var seekProgress by remember { mutableFloatStateOf(0f) }
 
@@ -162,8 +255,13 @@ fun PlayerScreen(
             .background(VybeBlack)
             .testTag("full_player_screen")
     ) {
+        // Atmospheric Glow Background from Song Artwork
         if (currentSong != null && currentSong.artworkUrl.isNotBlank()) {
-            Box(modifier = Modifier.fillMaxSize().blur(70.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(70.dp)
+            ) {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
                         .data(currentSong.artworkUrl)
@@ -174,6 +272,8 @@ fun PlayerScreen(
                     modifier = Modifier.fillMaxSize()
                 )
             }
+
+            // Dark gradient overlay to keep it subtle & readable
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -196,22 +296,41 @@ fun PlayerScreen(
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // TOP BAR
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
                     onClick = onCollapse,
-                    modifier = Modifier.size(40.dp).background(Color(0x22FFFFFF), CircleShape)
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(Color(0x22FFFFFF), CircleShape)
+                        .testTag("collapse_player_button")
                 ) {
-                    Icon(Icons.Default.KeyboardArrowDown, "Collapse Player", tint = Color.White, modifier = Modifier.size(28.dp))
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Collapse Player",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
                 }
 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("PLAYING FROM", color = VybeTextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
-                        playerState.playlistName,
+                        text = "PLAYING FROM",
+                        color = VybeTextMuted,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp
+                    )
+                    Text(
+                        text = playerState.playlistName,
                         color = VybeTextPrimary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -223,10 +342,19 @@ fun PlayerScreen(
                 Box {
                     IconButton(
                         onClick = { showMenu = true },
-                        modifier = Modifier.size(40.dp).background(Color(0x22FFFFFF), CircleShape)
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Color(0x22FFFFFF), CircleShape)
+                            .testTag("player_options_button")
                     ) {
-                        Icon(Icons.Default.MoreVert, "Options", tint = Color.White)
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Options",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
                     }
+
                     DropdownMenu(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false },
@@ -234,228 +362,516 @@ fun PlayerScreen(
                     ) {
                         DropdownMenuItem(
                             text = { Text("Share Track", color = VybeTextPrimary) },
-                            leadingIcon = { Icon(Icons.Outlined.Share, null, tint = VybeOrange) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Outlined.Share,
+                                    contentDescription = null,
+                                    tint = VybeOrange
+                                )
+                            },
                             onClick = {
                                 showMenu = false
                                 currentSong?.let { shareSong(context, it) }
                             }
                         )
+
                         DropdownMenuItem(
                             text = { Text("Add to Playlist", color = VybeTextPrimary) },
-                            leadingIcon = { Icon(Icons.Default.PlaylistAdd, null, tint = VybeOrange) },
-                            onClick = { showMenu = false; showAddToPlaylistSheet = true }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(if (isDownloaded) "Downloaded" else "Download Track", color = VybeTextPrimary) },
                             leadingIcon = {
                                 Icon(
-                                    if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
-                                    null,
+                                    Icons.Default.PlaylistAdd,
+                                    contentDescription = null,
+                                    tint = VybeOrange
+                                )
+                            },
+                            onClick = {
+                                showMenu = false
+                                showAddToPlaylistSheet = true
+                            }
+                        )
+
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    if (isDownloaded) "Downloaded" else "Download Track",
+                                    color = VybeTextPrimary
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = if (isDownloaded) {
+                                        Icons.Default.DownloadDone
+                                    } else {
+                                        Icons.Default.Download
+                                    },
+                                    contentDescription = null,
                                     tint = VybeElectricCyan
                                 )
                             },
                             onClick = {
                                 showMenu = false
                                 currentSong?.let { song ->
-                                    scope.launch { VybeApp.instance.repository.toggleDownloadSong(song) }
+                                    scope.launch {
+                                        VybeApp.instance.repository.toggleDownloadSong(song)
+                                    }
                                 }
                             }
                         )
+
                         DropdownMenuItem(
                             text = { Text("View Queue", color = VybeTextPrimary) },
-                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.QueueMusic, null, tint = VybeTextSecondary) },
-                            onClick = { showMenu = false; showQueueSheet = true }
+                            leadingIcon = {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.QueueMusic,
+                                    contentDescription = null,
+                                    tint = VybeTextSecondary
+                                )
+                            },
+                            onClick = {
+                                showMenu = false
+                                showQueueSheet = true
+                            }
                         )
                     }
                 }
             }
 
+            // CENTER ARTWORK
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 16.dp)
                     .aspectRatio(1f)
-                    .shadow(32.dp, RoundedCornerShape(24.dp), spotColor = VybeOrange.copy(alpha = 0.35f))
+                    .shadow(
+                        32.dp,
+                        RoundedCornerShape(24.dp),
+                        spotColor = VybeOrange.copy(alpha = 0.35f)
+                    )
                     .clip(RoundedCornerShape(24.dp))
                     .background(VybeSurfaceVariant)
+                    .testTag("player_artwork")
             ) {
                 if (currentSong != null) {
                     AsyncImage(
-                        model = ImageRequest.Builder(context).data(currentSong.artworkUrl).crossfade(true).build(),
+                        model = ImageRequest.Builder(context)
+                            .data(currentSong.artworkUrl)
+                            .crossfade(true)
+                            .build(),
                         contentDescription = currentSong.title,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.PlayArrow, null, tint = VybeTextMuted, modifier = Modifier.size(64.dp))
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = VybeTextMuted,
+                            modifier = Modifier.size(64.dp)
+                        )
                     }
                 }
+
+                // Buffering indicator
                 if (playerState.isBuffering) {
-                    Box(Modifier.fillMaxSize().background(Color(0x66000000)), contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0x66000000)),
+                        contentAlignment = Alignment.Center
+                    ) {
                         CircularProgressIndicator(color = VybeOrange)
                     }
                 }
             }
 
+            // TRACK METADATA & FAVORITE BUTTON
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(
-                        currentSong?.title ?: "No Track Selected",
+                        text = currentSong?.title ?: "No Track Selected",
                         color = VybeTextPrimary,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        currentSong?.artist ?: "Vybe Music",
+                        text = currentSong?.artist ?: "Vybe Music",
                         color = VybeTextSecondary,
                         fontSize = 15.sp,
+                        fontWeight = FontWeight.Normal,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                IconButton(onClick = { currentSong?.let(onToggleFavorite) }) {
+
+                IconButton(
+                    onClick = { currentSong?.let { onToggleFavorite(it) } },
+                    modifier = Modifier
+                        .size(44.dp)
+                        .testTag("player_favorite_button")
+                ) {
                     Icon(
-                        if (currentSong?.isLiked == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        "Favorite",
-                        tint = if (currentSong?.isLiked == true) VybeCoral else VybeTextSecondary,
+                        imageVector = if (currentSong?.isLiked == true) {
+                            Icons.Default.Favorite
+                        } else {
+                            Icons.Default.FavoriteBorder
+                        },
+                        contentDescription = "Favorite",
+                        tint = if (currentSong?.isLiked == true) {
+                            VybeCoral
+                        } else {
+                            VybeTextSecondary
+                        },
                         modifier = Modifier.size(28.dp)
                     )
                 }
             }
 
+            // YOUTUBE STYLE SLEEK TIMELINE & DURATION TIMESTAMPS
             YouTubePlayerTimeline(
                 progress = if (isSeeking) seekProgress else playerState.progress,
                 durationMs = playerState.durationMs,
                 currentPositionMs = playerState.currentPositionMs,
                 isSeeking = isSeeking,
-                onSeekStart = { isSeeking = true; seekProgress = playerState.progress },
-                onSeekProgress = { seekProgress = it },
-                onSeekFinished = { targetMs -> playerManager.seekTo(targetMs); isSeeking = false }
+                onSeekStart = {
+                    isSeeking = true
+                    seekProgress = playerState.progress
+                },
+                onSeekProgress = { fraction ->
+                    seekProgress = fraction
+                },
+                onSeekFinished = { targetMs ->
+                    playerManager.seekTo(targetMs)
+                    isSeeking = false
+                }
             )
 
+            // MAIN PLAYBACK CONTROLS
             Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { playerManager.toggleShuffle() }, modifier = Modifier.size(40.dp)) {
-                    Icon(Icons.Default.Shuffle, "Shuffle", tint = if (playerState.isShuffleEnabled) VybeOrange else VybeTextMuted)
+                // Shuffle
+                IconButton(
+                    onClick = { playerManager.toggleShuffle() },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Shuffle,
+                        contentDescription = "Shuffle",
+                        tint = if (playerState.isShuffleEnabled) {
+                            VybeOrange
+                        } else {
+                            VybeTextMuted
+                        },
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
-                IconButton(onClick = { playerManager.previous() }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.SkipPrevious, "Previous", tint = Color.White, modifier = Modifier.size(36.dp))
+
+                // Previous
+                IconButton(
+                    onClick = { playerManager.previous() },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SkipPrevious,
+                        contentDescription = "Previous",
+                        tint = Color.White,
+                        modifier = Modifier.size(36.dp)
+                    )
                 }
+
+                // Main Play/Pause Button with Pulsing Glow
                 Box(
                     modifier = Modifier
                         .size(68.dp)
+                        .pulsingGlow(
+                            color = VybePink,
+                            minRadius = 10.dp,
+                            maxRadius = 22.dp,
+                            minAlpha = 0.35f,
+                            maxAlpha = 0.85f
+                        )
                         .clip(CircleShape)
-                        .background(Brush.linearGradient(listOf(VybePink, VybeOrange)))
-                        .border(1.5.dp, Color.White.copy(alpha = 0.35f), CircleShape)
-                        .clickable { playerManager.togglePlayPause() },
+                        .background(
+                            Brush.linearGradient(
+                                listOf(VybePink, VybeOrange)
+                            )
+                        )
+                        .border(
+                            1.5.dp,
+                            Color.White.copy(alpha = 0.35f),
+                            CircleShape
+                        )
+                        .clickable { playerManager.togglePlayPause() }
+                        .testTag("player_play_pause_button"),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        if (playerState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        if (playerState.isPlaying) "Pause" else "Play",
+                        imageVector = if (playerState.isPlaying) {
+                            Icons.Default.Pause
+                        } else {
+                            Icons.Default.PlayArrow
+                        },
+                        contentDescription = if (playerState.isPlaying) "Pause" else "Play",
                         tint = Color.White,
                         modifier = Modifier.size(34.dp)
                     )
                 }
-                IconButton(onClick = { playerManager.next() }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.SkipNext, "Next", tint = Color.White, modifier = Modifier.size(36.dp))
-                }
-                IconButton(onClick = { playerManager.cycleRepeatMode() }, modifier = Modifier.size(40.dp)) {
+
+                // Next
+                IconButton(
+                    onClick = { playerManager.next() },
+                    modifier = Modifier.size(48.dp)
+                ) {
                     Icon(
-                        if (playerState.repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
-                        "Repeat",
-                        tint = if (playerState.repeatMode != Player.REPEAT_MODE_OFF) VybeOrange else VybeTextMuted
+                        imageVector = Icons.Default.SkipNext,
+                        contentDescription = "Next",
+                        tint = Color.White,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+
+                // Repeat Mode
+                IconButton(
+                    onClick = { playerManager.cycleRepeatMode() },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    val icon = if (playerState.repeatMode == Player.REPEAT_MODE_ONE) {
+                        Icons.Default.RepeatOne
+                    } else {
+                        Icons.Default.Repeat
+                    }
+
+                    val tint = if (
+                        playerState.repeatMode != Player.REPEAT_MODE_OFF
+                    ) {
+                        VybeOrange
+                    } else {
+                        VybeTextMuted
+                    }
+
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = "Repeat",
+                        tint = tint,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
 
+            // BOTTOM ACTION ROW: LYRICS & QUEUE
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Lyrics button
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
                         .background(VybeSurface)
                         .clickable { showLyricsSheet = true }
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .testTag("lyrics_button"),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(Icons.Outlined.Lyrics, "Lyrics", tint = VybeElectricCyan, modifier = Modifier.size(18.dp))
-                    Text("Lyrics", color = VybeTextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Icon(
+                        imageVector = Icons.Outlined.Lyrics,
+                        contentDescription = "Lyrics",
+                        tint = VybeElectricCyan,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Lyrics",
+                        color = VybeTextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
+
+                // Queue button
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
                         .background(VybeSurface)
                         .clickable { showQueueSheet = true }
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .testTag("queue_button"),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.QueueMusic, "Queue", tint = VybeOrange, modifier = Modifier.size(18.dp))
-                    Text("Queue (${playerState.queue.size})", color = VybeTextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                        contentDescription = "Queue",
+                        tint = VybeOrange,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Queue (${playerState.queue.size})",
+                        color = VybeTextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }
 
+        // QUEUE BOTTOM SHEET
         if (showQueueSheet) {
             ModalBottomSheet(
                 onDismissRequest = { showQueueSheet = false },
                 sheetState = sheetState,
                 containerColor = VybeNearBlack
             ) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Now Playing & Queue", color = VybeTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        IconButton(onClick = { scope.launch { sheetState.hide() }.invokeOnCompletion { showQueueSheet = false } }) {
-                            Icon(Icons.Default.Close, "Close", tint = VybeTextSecondary)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Now Playing & Queue",
+                            color = VybeTextPrimary,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    sheetState.hide()
+                                }.invokeOnCompletion {
+                                    showQueueSheet = false
+                                }
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = VybeTextSecondary
+                            )
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
-                    LazyColumn(Modifier.fillMaxWidth().height(400.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(400.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         itemsIndexed(playerState.queue) { index, song ->
                             val isCurrent = index == playerState.currentIndex
+
                             Row(
-                                Modifier
+                                modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isCurrent) Color(0x1FFF6436) else VybeSurface)
-                                    .clickable { playerManager.playSong(song, playerState.queue, playerState.playlistName) }
+                                    .background(
+                                        if (isCurrent) {
+                                            Color(0x1FFF6436)
+                                        } else {
+                                            VybeSurface
+                                        }
+                                    )
+                                    .clickable {
+                                        playerManager.playSong(
+                                            song,
+                                            playerState.queue,
+                                            playerState.playlistName
+                                        )
+                                    }
                                     .padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).background(VybeSurfaceVariant)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(VybeSurfaceVariant)
+                                ) {
                                     AsyncImage(
-                                        model = ImageRequest.Builder(context).data(song.artworkUrl).crossfade(true).build(),
+                                        model = ImageRequest.Builder(context)
+                                            .data(song.artworkUrl)
+                                            .crossfade(true)
+                                            .build(),
                                         contentDescription = song.title,
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }
-                                Spacer(Modifier.width(12.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(song.title, color = if (isCurrent) VybeOrange else VybeTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(song.artist, color = VybeTextSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Column(
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = song.title,
+                                        color = if (isCurrent) {
+                                            VybeOrange
+                                        } else {
+                                            VybeTextPrimary
+                                        },
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+
+                                    Text(
+                                        text = song.artist,
+                                        color = VybeTextSecondary,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
+
                                 if (isCurrent && playerState.isPlaying) {
-                                    EqualizerWaveformIndicator(Modifier.size(20.dp), VybeOrange)
+                                    EqualizerWaveformIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        color = VybeOrange
+                                    )
                                 } else {
-                                    IconButton(onClick = { playerManager.removeFromQueue(index) }, modifier = Modifier.size(32.dp)) {
-                                        Icon(Icons.Default.Close, "Remove", tint = VybeTextMuted, modifier = Modifier.size(16.dp))
+                                    IconButton(
+                                        onClick = {
+                                            playerManager.removeFromQueue(index)
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Remove",
+                                            tint = VybeTextMuted,
+                                            modifier = Modifier.size(16.dp)
+                                        )
                                     }
                                 }
                             }
@@ -465,6 +881,7 @@ fun PlayerScreen(
             }
         }
 
+        // LYRICS BOTTOM SHEET
         if (showLyricsSheet) {
             ModalBottomSheet(
                 onDismissRequest = { showLyricsSheet = false },
@@ -472,105 +889,189 @@ fun PlayerScreen(
                 containerColor = VybeNearBlack
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 300.dp, max = 650.dp).padding(24.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(600.dp)
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Lyrics", color = VybeTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
                     Text(
-                        "${currentSong?.title ?: "Unknown"} — ${currentSong?.artist ?: "Unknown"}",
+                        text = "Lyrics",
+                        color = VybeTextPrimary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "${currentSong?.title ?: "Unknown"} — ${currentSong?.artist ?: "Unknown"}",
                         color = VybeTextSecondary,
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(24.dp))
 
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        contentPadding = PaddingValues(bottom = 32.dp)
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.TopCenter
                     ) {
-                        item {
-                            when {
-                                lyricsLoading -> {
-                                    CircularProgressIndicator(color = VybeOrange, modifier = Modifier.size(32.dp))
-                                }
-                                lyricsError != null -> {
-                                    Text(
-                                        lyricsError!!,
-                                        color = VybeTextMuted,
-                                        fontSize = 15.sp,
-                                        textAlign = TextAlign.Center,
-                                        lineHeight = 24.sp
-                                    )
-                                }
-                                !lyricsText.isNullOrBlank() -> {
-                                    Text(
-                                        lyricsText!!,
-                                        color = VybeTextPrimary,
-                                        fontSize = 16.sp,
-                                        lineHeight = 26.sp,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-                                else -> {
-                                    Text(
-                                        "Lyrics are not available for this song.",
-                                        color = VybeTextMuted,
-                                        fontSize = 15.sp,
-                                        textAlign = TextAlign.Center
-                                    )
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            item {
+                                when {
+                                    lyricsLoading -> {
+                                        CircularProgressIndicator(
+                                            color = VybeOrange,
+                                            modifier = Modifier
+                                                .padding(top = 40.dp)
+                                                .size(32.dp)
+                                        )
+                                    }
+
+                                    lyricsError != null -> {
+                                        Text(
+                                            text = lyricsError ?: "Lyrics unavailable",
+                                            color = VybeTextMuted,
+                                            fontSize = 15.sp,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.padding(
+                                                top = 40.dp,
+                                                start = 16.dp,
+                                                end = 16.dp
+                                            )
+                                        )
+                                    }
+
+                                    !lyricsText.isNullOrBlank() -> {
+                                        Text(
+                                            text = lyricsText.orEmpty(),
+                                            color = VybeTextPrimary,
+                                            fontSize = 16.sp,
+                                            lineHeight = 26.sp,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 8.dp)
+                                        )
+                                    }
+
+                                    else -> {
+                                        Text(
+                                            text = "Lyrics are not available for this song.",
+                                            color = VybeTextMuted,
+                                            fontSize = 15.sp,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.padding(
+                                                top = 40.dp,
+                                                start = 16.dp,
+                                                end = 16.dp
+                                            )
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
             }
         }
 
+        // ADD TO PLAYLIST SHEET
         if (showAddToPlaylistSheet && currentSong != null) {
             ModalBottomSheet(
                 onDismissRequest = { showAddToPlaylistSheet = false },
                 containerColor = VybeSurface,
                 dragHandle = null
             ) {
-                Column(Modifier.fillMaxWidth().padding(20.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Add to Playlist", color = VybeTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        IconButton(onClick = { showAddToPlaylistSheet = false }) {
-                            Icon(Icons.Default.Close, "Close", tint = VybeTextSecondary)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Add to Playlist",
+                            color = VybeTextPrimary,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        IconButton(
+                            onClick = { showAddToPlaylistSheet = false }
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = VybeTextSecondary
+                            )
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     if (userPlaylists.isEmpty()) {
                         Text(
-                            "No custom playlists found. Go to Library -> Playlists -> My Playlist to create one!",
+                            text = "No custom playlists found. Go to Library -> Playlists -> My Playlist to create one!",
                             color = VybeTextMuted,
                             fontSize = 13.sp,
                             modifier = Modifier.padding(vertical = 20.dp)
                         )
                     } else {
-                        LazyColumn(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(userPlaylists, key = { it.id }) { playlist ->
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(
+                                items = userPlaylists,
+                                key = { it.id }
+                            ) { playlist ->
                                 Row(
-                                    Modifier
+                                    modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(VybeSurfaceVariant)
                                         .clickable {
                                             scope.launch {
-                                                VybeApp.instance.repository.addSongToUserPlaylist(playlist.id, currentSong)
+                                                VybeApp.instance.repository.addSongToUserPlaylist(
+                                                    playlist.id,
+                                                    currentSong
+                                                )
                                                 showAddToPlaylistSheet = false
                                             }
                                         }
                                         .padding(14.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.AutoMirrored.Filled.QueueMusic, null, tint = VybeOrange, modifier = Modifier.size(24.dp))
-                                    Spacer(Modifier.width(12.dp))
-                                    Text(playlist.title, color = VybeTextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                                        contentDescription = null,
+                                        tint = VybeOrange,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Text(
+                                        text = playlist.title,
+                                        color = VybeTextPrimary,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
                             }
                         }
@@ -582,14 +1083,18 @@ fun PlayerScreen(
 }
 
 private fun shareSong(context: Context, song: Song) {
-    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+    val sendIntent = Intent().apply {
+        action = Intent.ACTION_SEND
         putExtra(
             Intent.EXTRA_TEXT,
             "🎵 Listening to \"${song.title}\" by ${song.artist} on VYBE!\n\nDownload VYBE: https://t.me/VyomaOfficial"
         )
         type = "text/plain"
     }
-    context.startActivity(Intent.createChooser(sendIntent, "Share Track via"))
+
+    context.startActivity(
+        Intent.createChooser(sendIntent, "Share Track via")
+    )
 }
 
 @Composable
@@ -603,50 +1108,83 @@ fun YouTubePlayerTimeline(
     onSeekFinished: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val safeDuration = durationMs.coerceAtLeast(0L)
-    val displayedCurrentMs = if (isSeeking) (progress.coerceIn(0f, 1f) * safeDuration).toLong() else currentPositionMs
+    val displayedCurrentMs = if (isSeeking) {
+        (progress * durationMs).toLong()
+    } else {
+        currentPositionMs
+    }
 
+    // YouTube circle scrubber size.
     val animatedThumbRadius by animateDpAsState(
         targetValue = if (isSeeking) 7.5.dp else 4.5.dp,
         label = "thumb_radius"
     )
+
+    // Thin and sleek timeline bar.
     val animatedTrackHeight by animateDpAsState(
         targetValue = if (isSeeking) 3.5.dp else 2.dp,
         label = "track_height"
     )
 
-    Column(modifier = modifier.fillMaxWidth().testTag("player_seekbar")) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("player_seekbar")
+    ) {
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(28.dp)
-                .pointerInput(safeDuration) {
-                    detectTapGestures { offset ->
-                        val width = size.width.toFloat()
-                        if (width > 0f) {
-                            val fraction = (offset.x / width).coerceIn(0f, 1f)
-                            onSeekStart()
-                            onSeekProgress(fraction)
-                            onSeekFinished((fraction * safeDuration).toLong())
+                .pointerInput(durationMs) {
+                    detectTapGestures(
+                        onPress = { offset ->
+                            val width = size.width.toFloat()
+
+                            if (width > 0) {
+                                val fraction = (offset.x / width).coerceIn(0f, 1f)
+                                onSeekStart()
+                                onSeekProgress(fraction)
+
+                                val success = tryAwaitRelease()
+
+                                if (success) {
+                                    val targetMs = (fraction * durationMs).toLong()
+                                    onSeekFinished(targetMs)
+                                }
+                            }
                         }
-                    }
+                    )
                 }
-                .pointerInput(safeDuration) {
+                .pointerInput(durationMs) {
                     detectDragGestures(
                         onDragStart = { offset ->
                             val width = size.width.toFloat()
-                            if (width > 0f) {
+
+                            if (width > 0) {
                                 onSeekStart()
-                                onSeekProgress((offset.x / width).coerceIn(0f, 1f))
+                                val fraction = (offset.x / width).coerceIn(0f, 1f)
+                                onSeekProgress(fraction)
                             }
                         },
                         onDrag = { change, _ ->
                             change.consume()
+
                             val width = size.width.toFloat()
-                            if (width > 0f) onSeekProgress((change.position.x / width).coerceIn(0f, 1f))
+
+                            if (width > 0) {
+                                val fraction =
+                                    (change.position.x / width).coerceIn(0f, 1f)
+                                onSeekProgress(fraction)
+                            }
                         },
-                        onDragEnd = { onSeekFinished((progress.coerceIn(0f, 1f) * safeDuration).toLong()) },
-                        onDragCancel = { onSeekFinished((progress.coerceIn(0f, 1f) * safeDuration).toLong()) }
+                        onDragEnd = {
+                            val targetMs = (progress * durationMs).toLong()
+                            onSeekFinished(targetMs)
+                        },
+                        onDragCancel = {
+                            val targetMs = (progress * durationMs).toLong()
+                            onSeekFinished(targetMs)
+                        }
                     )
                 },
             contentAlignment = Alignment.CenterStart
@@ -655,42 +1193,86 @@ fun YouTubePlayerTimeline(
             val safeProgress = progress.coerceIn(0f, 1f)
             val thumbXOffsetPx = totalWidthPx * safeProgress
             val density = LocalDensity.current
-            val thumbOffsetDp = with(density) { thumbXOffsetPx.toDp() }
-            val maxThumbOffsetDp = with(density) {
-                (totalWidthPx - animatedThumbRadius.toPx() * 2).coerceAtLeast(0f).toDp()
+
+            val thumbOffsetDp = with(density) {
+                thumbXOffsetPx.toDp()
             }
 
+            val maxThumbOffsetDp = with(density) {
+                (
+                    totalWidthPx - animatedThumbRadius.toPx() * 2
+                ).coerceAtLeast(0f).toDp()
+            }
+
+            // Inactive Track
             Box(
-                Modifier.fillMaxWidth().height(animatedTrackHeight).clip(CircleShape).background(Color(0x33FFFFFF))
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(animatedTrackHeight)
+                    .clip(CircleShape)
+                    .background(Color(0x33FFFFFF))
             )
+
+            // Active Track
             Box(
-                Modifier.width(thumbOffsetDp).height(animatedTrackHeight).clip(CircleShape)
-                    .background(Brush.horizontalGradient(listOf(VybePink, VybeOrange)))
+                modifier = Modifier
+                    .width(thumbOffsetDp)
+                    .height(animatedTrackHeight)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(VybePink, VybeOrange)
+                        )
+                    )
             )
+
+            // YouTube-style front circular scrubber dot.
             Box(
-                Modifier
-                    .offset(x = (thumbOffsetDp - animatedThumbRadius).coerceIn(0.dp, maxThumbOffsetDp))
+                modifier = Modifier
+                    .offset(
+                        x = (
+                            thumbOffsetDp - animatedThumbRadius
+                        ).coerceIn(0.dp, maxThumbOffsetDp)
+                    )
                     .size(animatedThumbRadius * 2)
+                    .neonGlow(
+                        color = GlowOrange,
+                        radius = if (isSeeking) 14.dp else 6.dp,
+                        alpha = if (isSeeking) 0.85f else 0.55f
+                    )
                     .clip(CircleShape)
                     .background(Color.White)
-                    .border(if (isSeeking) 2.dp else 1.5.dp, Color(0xFFFF5E3A), CircleShape)
+                    .border(
+                        width = if (isSeeking) 2.dp else 1.5.dp,
+                        color = Color(0xFFFF5E3A),
+                        shape = CircleShape
+                    )
             )
         }
 
-        Spacer(Modifier.height(2.dp))
-        Row(Modifier.fillMaxWidth().padding(horizontal = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Spacer(modifier = Modifier.height(2.dp))
+
+        // Timestamps below the timeline.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
             Text(
-                MusicUtils.formatDurationMs(displayedCurrentMs),
+                text = MusicUtils.formatDurationMs(displayedCurrentMs),
                 color = if (isSeeking) VybeOrange else VybeTextSecondary,
                 fontSize = 12.sp,
                 fontFamily = OutfitFontFamily,
                 fontWeight = if (isSeeking) FontWeight.Bold else FontWeight.Medium
             )
+
             Text(
-                MusicUtils.formatDurationMs(safeDuration),
+                text = MusicUtils.formatDurationMs(durationMs),
                 color = VybeTextMuted,
                 fontSize = 12.sp,
-                fontFamily = OutfitFontFamily
+                fontFamily = OutfitFontFamily,
+                fontWeight = FontWeight.Normal
             )
         }
     }
