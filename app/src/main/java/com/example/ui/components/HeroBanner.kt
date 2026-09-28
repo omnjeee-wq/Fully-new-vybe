@@ -463,7 +463,7 @@ fun HeroBanner(
                 // ----------------------------------------------------
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth(0.72f)
+                        .fillMaxWidth(0.52f)
                         .padding(bottom = 4.dp)
                 ) {
                     Text(
