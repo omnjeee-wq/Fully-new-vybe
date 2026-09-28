@@ -103,6 +103,7 @@ import com.example.domain.model.Song
 import com.example.player.PlayerManager
 import com.example.ui.components.EqualizerWaveformIndicator
 import com.example.ui.theme.VybeBlack
+import com.example.ui.theme.VybeBorder
 import com.example.ui.theme.VybeCoral
 import com.example.ui.theme.VybeElectricCyan
 import com.example.ui.theme.VybeNearBlack
