@@ -2,6 +2,7 @@ package com.example.ui.player
 
 import android.content.Context
 import android.content.Intent
+import android.text.Html
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -219,11 +220,13 @@ fun PlayerScreen(
                 }
             }
 
-            if (result.isBlank()) {
+            val cleanedLyrics = normalizeLyrics(result)
+
+            if (cleanedLyrics.isBlank()) {
                 lyricsText = null
                 lyricsError = "Lyrics are not available for this song."
             } else {
-                lyricsText = result
+                lyricsText = cleanedLyrics
                 lyricsError = null
             }
         } catch (e: Exception) {
@@ -886,78 +889,133 @@ fun PlayerScreen(
             ModalBottomSheet(
                 onDismissRequest = { showLyricsSheet = false },
                 sheetState = sheetState,
-                containerColor = VybeNearBlack
+                containerColor = VybeNearBlack,
+                dragHandle = null,
+                modifier = Modifier.fillMaxSize()
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(600.dp)
-                        .padding(horizontal = 24.dp, vertical = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .fillMaxSize()
+                        .navigationBarsPadding()
                 ) {
-                    Text(
-                        text = "Lyrics",
-                        color = VybeTextPrimary,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "Lyrics",
+                                color = VybeTextPrimary,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = "${currentSong?.title ?: "Unknown"} — ${currentSong?.artist ?: "Unknown"}",
+                                color = VybeTextSecondary,
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "${currentSong?.title ?: "Unknown"} — ${currentSong?.artist ?: "Unknown"}",
-                        color = VybeTextSecondary,
-                        fontSize = 13.sp,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
+                        IconButton(
+                            onClick = { showLyricsSheet = false },
+                            modifier = Modifier
+                                .size(42.dp)
+                                .background(
+                                    VybeSurfaceVariant.copy(alpha = 0.8f),
+                                    CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close lyrics",
+                                tint = VybeTextPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
 
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.TopCenter
+                            .height(1.dp)
+                            .background(VybeBorder.copy(alpha = 0.45f))
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(horizontal = 18.dp)
                     ) {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                top = 22.dp,
+                                bottom = 24.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             item {
                                 when {
                                     lyricsLoading -> {
-                                        CircularProgressIndicator(
-                                            color = VybeOrange,
+                                        Column(
                                             modifier = Modifier
-                                                .padding(top = 40.dp)
-                                                .size(32.dp)
-                                        )
+                                                .fillMaxWidth()
+                                                .padding(top = 60.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            CircularProgressIndicator(
+                                                color = VybeOrange,
+                                                modifier = Modifier.size(34.dp)
+                                            )
+                                            Spacer(modifier = Modifier.height(14.dp))
+                                            Text(
+                                                text = "Loading lyrics…",
+                                                color = VybeTextMuted,
+                                                fontSize = 14.sp
+                                            )
+                                        }
                                     }
 
                                     lyricsError != null -> {
-                                        Text(
-                                            text = lyricsError ?: "Lyrics unavailable",
-                                            color = VybeTextMuted,
-                                            fontSize = 15.sp,
-                                            textAlign = TextAlign.Center,
-                                            modifier = Modifier.padding(
-                                                top = 40.dp,
-                                                start = 16.dp,
-                                                end = 16.dp
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 60.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Text(
+                                                text = lyricsError ?: "Lyrics unavailable",
+                                                color = VybeTextMuted,
+                                                fontSize = 15.sp,
+                                                textAlign = TextAlign.Center
                                             )
-                                        )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = "Lyrics may not be available for this track.",
+                                                color = VybeTextMuted.copy(alpha = 0.7f),
+                                                fontSize = 13.sp,
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
                                     }
 
                                     !lyricsText.isNullOrBlank() -> {
                                         Text(
                                             text = lyricsText.orEmpty(),
                                             color = VybeTextPrimary,
-                                            fontSize = 16.sp,
-                                            lineHeight = 26.sp,
-                                            textAlign = TextAlign.Center,
+                                            fontSize = 18.sp,
+                                            lineHeight = 31.sp,
+                                            fontWeight = FontWeight.Normal,
+                                            textAlign = TextAlign.Start,
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .padding(horizontal = 8.dp)
@@ -970,11 +1028,9 @@ fun PlayerScreen(
                                             color = VybeTextMuted,
                                             fontSize = 15.sp,
                                             textAlign = TextAlign.Center,
-                                            modifier = Modifier.padding(
-                                                top = 40.dp,
-                                                start = 16.dp,
-                                                end = 16.dp
-                                            )
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 60.dp)
                                         )
                                     }
                                 }
@@ -982,7 +1038,106 @@ fun PlayerScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    // Mini-player stays visible while reading lyrics.
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(VybeSurfaceVariant)
+                            .padding(horizontal = 20.dp, vertical = 10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = currentSong?.title ?: "No Track Selected",
+                                    color = VybeTextPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = currentSong?.artist ?: "Vybe Music",
+                                    color = VybeTextSecondary,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            IconButton(
+                                onClick = { playerManager.previous() },
+                                modifier = Modifier.size(42.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SkipPrevious,
+                                    contentDescription = "Previous",
+                                    tint = VybeTextPrimary,
+                                    modifier = Modifier.size(25.dp)
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(VybePink, VybeOrange)
+                                        )
+                                    )
+                                    .clickable {
+                                        playerManager.togglePlayPause()
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (playerState.isPlaying) {
+                                        Icons.Default.Pause
+                                    } else {
+                                        Icons.Default.PlayArrow
+                                    },
+                                    contentDescription = if (playerState.isPlaying) {
+                                        "Pause"
+                                    } else {
+                                        "Play"
+                                    },
+                                    tint = Color.White,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+
+                            IconButton(
+                                onClick = { playerManager.next() },
+                                modifier = Modifier.size(42.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SkipNext,
+                                    contentDescription = "Next",
+                                    tint = VybeTextPrimary,
+                                    modifier = Modifier.size(25.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(5.dp))
+
+                        YouTubePlayerTimeline(
+                            progress = playerState.progress,
+                            durationMs = playerState.durationMs,
+                            currentPositionMs = playerState.currentPositionMs,
+                            isSeeking = false,
+                            onSeekStart = {},
+                            onSeekProgress = {},
+                            onSeekFinished = { targetMs ->
+                                playerManager.seekTo(targetMs)
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -1080,6 +1235,24 @@ fun PlayerScreen(
             }
         }
     }
+}
+
+private fun normalizeLyrics(rawLyrics: String): String {
+    if (rawLyrics.isBlank()) return ""
+
+    val withLineBreaks = rawLyrics
+        .replace(Regex("(?i)<br\\s*/?>"), "\\n")
+        .replace(Regex("(?i)</p>"), "\\n")
+        .replace(Regex("(?i)<p[^>]*>"), "")
+
+    return Html.fromHtml(
+        withLineBreaks,
+        Html.FROM_HTML_MODE_LEGACY
+    )
+        .toString()
+        .replace("\\r\\n", "\\n")
+        .replace(Regex("\\n{3,}"), "\\n\\n")
+        .trim()
 }
 
 private fun shareSong(context: Context, song: Song) {
