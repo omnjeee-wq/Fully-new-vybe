@@ -9,6 +9,7 @@ import com.example.data.model.ApiSong
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Url
 
 interface JioSaavnApiService {
 
@@ -64,6 +65,14 @@ interface JioSaavnApiService {
     @GET("api/songs/{id}/suggestions")
     suspend fun getSongSuggestions(
         @Path("id") id: String,
+        @Query("limit") limit: Int = 10
+    ): ApiResponse<List<ApiSong>>
+
+    @GET
+    suspend fun getQueue(
+        @Url url: String,
+        @Query("seeds") seeds: String,
+        @Query("exclude") exclude: String,
         @Query("limit") limit: Int = 10
     ): ApiResponse<List<ApiSong>>
 }
