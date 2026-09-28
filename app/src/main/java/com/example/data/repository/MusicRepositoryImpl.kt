@@ -235,11 +235,24 @@ class MusicRepositoryImpl(
         }
     }
 
+    private val queueUrl = "https://vyberadio.vyoma-apps.workers.dev/queue"
+
     override suspend fun getRadioQueue(songId: String, limit: Int): Result<List<Song>> = withContext(Dispatchers.IO) {
         try {
-            val response = apiService.getSongSuggestions(id = songId, limit = limit)
+            val recentIds = songDao.getRecentHistory(50).map { it.songId }
+            val seeds = (listOf(songId) + recentIds).distinct().take(3).joinToString(",")
+            val exclude = recentIds.reversed().joinToString(",")
+
+            val response = apiService.getQueue(url = queueUrl, seeds = seeds, exclude = exclude, limit = limit)
             val songs = response.data?.map { MusicUtils.toDomainSong(it) } ?: emptyList()
-            Result.success(songs)
+
+            if (songs.isNotEmpty()) {
+                Result.success(songs)
+            } else {
+                // backup: purana suggestions endpoint
+                val old = apiService.getSongSuggestions(id = songId, limit = limit)
+                Result.success(old.data?.map { MusicUtils.toDomainSong(it) } ?: emptyList())
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
