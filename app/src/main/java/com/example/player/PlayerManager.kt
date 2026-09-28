@@ -56,7 +56,39 @@ class PlayerManager private constructor(
     private var progressJob: Job? = null
     private var currentSongQualifyingCounted = false
     private var currentSongPlayStartTime = 0L
+    private var isRefillingQueue = false
 
+    private fun refillQueueIfNeeded() {
+        val state = _playerState.value
+        if (isRefillingQueue) return
+        if (state.repeatMode != Player.REPEAT_MODE_OFF) return
+        if (state.isSmartShuffleEnabled) return
+        val current = state.currentSong ?: return
+        val remaining = state.queue.size - state.currentIndex - 1
+        if (remaining > 2) return
+
+        isRefillingQueue = true
+        scope.launch {
+            try {
+                repository.getRadioQueue(songId = current.id, limit = 15).onSuccess { songs ->
+                    val existing = _playerState.value.queue.map { it.id }.toSet()
+                    val fresh = songs.filter { it.id !in existing }.distinctBy { it.id }.take(10)
+                    if (fresh.isNotEmpty()) {
+                        _playerState.update { it.copy(queue = it.queue + fresh) }
+                        executeWithController { ctrl ->
+                            ctrl.addMediaItems(fresh.map { it.toMediaItem() })
+                        }
+                        persistCurrentState()
+                    }
+                }
+            } finally {
+                isRefillingQueue = false
+            }
+        }
+    }
+
+    
+    
     init {
         restoreSavedState()
         connectToService()
@@ -235,6 +267,7 @@ class PlayerManager private constructor(
                 }
 
                 persistCurrentState()
+                refillQueueIfNeeded()
 
                 scope.launch(Dispatchers.IO) {
                     repository.recordListeningEvent(newSong, ListeningEventType.PLAY_STARTED)
