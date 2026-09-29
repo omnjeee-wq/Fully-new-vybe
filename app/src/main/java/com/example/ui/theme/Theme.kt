@@ -26,10 +26,20 @@ private val VybeColorScheme = lightColorScheme (
 
 @Composable
 fun VybeTheme(
+    themeMode: String = "Dark",
     content: @Composable () -> Unit
 ) {
+    val colorScheme = when (themeMode) {
+        "Light" -> VybeLightColorScheme
+        "System" -> {
+            val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+            if (isDark) VybeColorScheme else VybeLightColorScheme
+        }
+        else -> VybeColorScheme
+    }
+
     MaterialTheme(
-        colorScheme = VybeColorScheme,
+        colorScheme = colorScheme,
         typography = Typography,
         content = content
     )
