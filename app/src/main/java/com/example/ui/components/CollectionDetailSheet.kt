@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -89,7 +92,7 @@ fun CollectionDetailSheet(
         sheetState = sheetState,
         containerColor = VybeSurface,
         dragHandle = null,
-        modifier = modifier.fillMaxHeight(0.92f)
+        modifier = modifier.fillMaxHeight()
     ) {
         Column(
             modifier = Modifier
@@ -97,205 +100,211 @@ fun CollectionDetailSheet(
                 .background(VybeSurface)
                 .testTag("collection_sheet_${item.id}")
         ) {
-            // Top Bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Collection Type Pill
-                val badgeText = when (item.type) {
-                    SectionItemType.ALBUM -> "ALBUM"
-                    SectionItemType.CHART -> "TOP CHART"
-                    SectionItemType.PLAYLIST -> "PLAYLIST"
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(VybeSurfaceVariant)
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = badgeText,
-                        color = VybeOrange,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    )
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (onToggleFavoriteCollection != null) {
-                        IconButton(
-                            onClick = { onToggleFavoriteCollection(item) },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isCollectionFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                contentDescription = "Like collection",
-                                tint = if (isCollectionFavorite) VybePink else VybeTextSecondary
-                            )
-                        }
-                    }
-
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = VybeTextSecondary
-                        )
-                    }
-                }
-            }
-
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 90.dp)
+                contentPadding = PaddingValues(bottom = 140.dp)
             ) {
-                // Header Artwork & Info
+                // Immersive playlist header
                 item {
-                    Column(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 10.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .height(390.dp)
+                            .background(VybeSurface)
                     ) {
-                        // Artwork with subtle shadow
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(item.artworkUrl)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = item.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+
+                        // Dark fade: artwork melts naturally into the app background.
                         Box(
                             modifier = Modifier
-                                .size(190.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(VybeSurfaceVariant)
-                        ) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(context)
-                                    .data(item.artworkUrl)
-                                    .crossfade(true)
-                                    .build(),
-                                contentDescription = item.title,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Title
-                        Text(
-                            text = item.title,
-                            color = VybeTextPrimary,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // Subtitle
-                        Text(
-                            text = item.subtitle,
-                            color = VybeTextSecondary,
-                            fontSize = 14.sp,
-                            textAlign = TextAlign.Center,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-
-                        Spacer(modifier = Modifier.height(18.dp))
-
-                        // Actions: Play All & Shuffle
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Play All Gradient Button
-                            Button(
-                                onClick = {
-                                    if (state.songs.isNotEmpty()) onPlayAll(state.songs)
-                                },
-                                enabled = state.songs.isNotEmpty(),
-                                shape = RoundedCornerShape(24.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color.Transparent,
-                                    disabledContainerColor = VybeSurfaceVariant
-                                ),
-                                contentPadding = PaddingValues(0.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(48.dp)
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            listOf(VybeOrange, VybePink)
+                                .fillMaxWidth()
+                                .height(230.dp)
+                                .align(Alignment.BottomCenter)
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            Color.Transparent,
+                                            VybeSurface
                                         )
                                     )
-                                    .testTag("collection_play_all")
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.PlayArrow,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Play All",
-                                        color = Color.White,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
+                                )
+                        )
+
+                        // Top controls sit over the artwork but respect the status bar.
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .windowInsetsPadding(WindowInsets.safeDrawing)
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val badgeText = when (item.type) {
+                                SectionItemType.ALBUM -> "ALBUM"
+                                SectionItemType.CHART -> "TOP CHART"
+                                SectionItemType.PLAYLIST -> "PLAYLIST"
                             }
 
-                            // Shuffle Button
-                            OutlinedButton(
-                                onClick = {
-                                    if (state.songs.isNotEmpty()) onShuffle(state.songs)
-                                },
-                                enabled = state.songs.isNotEmpty(),
-                                shape = RoundedCornerShape(24.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = VybeTextPrimary
-                                ),
+                            Box(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .height(48.dp)
-                                    .testTag("collection_shuffle")
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color.Black.copy(alpha = 0.45f))
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
+                                Text(
+                                    text = badgeText,
+                                    color = VybeOrange,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp
+                                )
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (onToggleFavoriteCollection != null) {
+                                    IconButton(
+                                        onClick = { onToggleFavoriteCollection(item) },
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isCollectionFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                            contentDescription = "Like collection",
+                                            tint = if (isCollectionFavorite) VybePink else Color.White
+                                        )
+                                    }
+                                }
+
+                                IconButton(
+                                    onClick = onDismiss,
+                                    modifier = Modifier.size(40.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Shuffle,
-                                        contentDescription = null,
-                                        tint = VybeTextPrimary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Shuffle",
-                                        color = VybeTextPrimary,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.SemiBold
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Close",
+                                        tint = Color.White
                                     )
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        // Title and metadata fade into the lower part of the artwork.
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 22.dp)
+                        ) {
+                            Text(
+                                text = item.title,
+                                color = VybeTextPrimary,
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            Spacer(modifier = Modifier.height(5.dp))
+
+                            Text(
+                                text = item.subtitle,
+                                color = VybeTextSecondary,
+                                fontSize = 14.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    // Actions below the immersive header.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = {
+                                if (state.songs.isNotEmpty()) onPlayAll(state.songs)
+                            },
+                            enabled = state.songs.isNotEmpty(),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent,
+                                disabledContainerColor = VybeSurfaceVariant
+                            ),
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(
+                                    Brush.horizontalGradient(listOf(VybeOrange, VybePink))
+                                )
+                                .testTag("collection_play_all")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Play All",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                if (state.songs.isNotEmpty()) onShuffle(state.songs)
+                            },
+                            enabled = state.songs.isNotEmpty(),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = VybeTextPrimary
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .testTag("collection_shuffle")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Shuffle,
+                                    contentDescription = null,
+                                    tint = VybeTextPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Shuffle",
+                                    color = VybeTextPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
                     }
                 }
 
