@@ -2,6 +2,8 @@ package com.example.ui.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.domain.model.SectionItem
+import com.example.domain.model.SectionItemType
 import com.example.domain.model.Song
 import com.example.domain.repository.MusicRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -9,13 +11,20 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import com.example.player.PlayerManager
+import com.example.ui.home.CollectionDetailState
 
 sealed interface SearchUiState {
     data object Idle : SearchUiState
     data object Loading : SearchUiState
-    data class Success(val query: String, val songs: List<Song>) : SearchUiState
+    data class Success(
+        val query: String,
+        val songs: List<Song>,
+        val collections: List<SectionItem> = emptyList(),
+        val selectedCollection: CollectionDetailState? = null
+    ) : SearchUiState
     data class Empty(val query: String) : SearchUiState
     data class Error(val message: String) : SearchUiState
 }
@@ -62,16 +71,60 @@ class SearchViewModel(
             // Save to search history (max 10, oldest deleted automatically)
             repository.saveSearchQuery(targetQuery)
 
-            val result = repository.searchSongs(targetQuery, limit = 40)
-            result.onSuccess { songs ->
-                if (songs.isEmpty()) {
+            try {
+                // Search songs + albums + playlists together so the top of the
+                // results can surface collections without changing the existing song search.
+                val songsDeferred = async { repository.searchSongs(targetQuery, limit = 40) }
+                val albumsDeferred = async { repository.searchAlbums(targetQuery, limit = 6) }
+                val playlistsDeferred = async { repository.searchPlaylists(targetQuery, limit = 6) }
+
+                val songsResult = songsDeferred.await()
+                val albumsResult = albumsDeferred.await()
+                val playlistsResult = playlistsDeferred.await()
+
+                val songs = songsResult.getOrNull().orEmpty()
+                val collections = buildList {
+                    albumsResult.getOrNull().orEmpty().take(2).forEach { album ->
+                        add(
+                            SectionItem(
+                                id = album.id,
+                                title = album.title,
+                                subtitle = if (album.year.isNotBlank()) "Album • ${album.year}" else "Album",
+                                artworkUrl = album.artworkUrl,
+                                type = SectionItemType.ALBUM,
+                                songCount = album.songCount,
+                                year = album.year,
+                                language = album.language
+                            )
+                        )
+                    }
+                    playlistsResult.getOrNull().orEmpty().take(2).forEach { playlist ->
+                        add(
+                            SectionItem(
+                                id = playlist.id,
+                                title = playlist.title,
+                                subtitle = playlist.subtitle.ifBlank { "Playlist" },
+                                artworkUrl = playlist.artworkUrl,
+                                type = SectionItemType.PLAYLIST,
+                                songCount = playlist.songCount,
+                                language = playlist.language
+                            )
+                        )
+                    }
+                }.take(3)
+
+                if (songs.isEmpty() && collections.isEmpty()) {
                     _uiState.value = SearchUiState.Empty(targetQuery)
                 } else {
-                    _uiState.value = SearchUiState.Success(targetQuery, songs)
+                    _uiState.value = SearchUiState.Success(
+                        query = targetQuery,
+                        songs = songs,
+                        collections = collections
+                    )
                 }
-            }.onFailure { error ->
+            } catch (error: Exception) {
                 _uiState.value = SearchUiState.Error(
-                    error.localizedMessage ?: "Failed to find songs. Please check your network and try again."
+                    error.localizedMessage ?: "Failed to search. Please check your network and try again."
                 )
             }
         }
@@ -137,6 +190,49 @@ class SearchViewModel(
     }
      }
      
+    fun openCollection(item: SectionItem) {
+        val current = _uiState.value
+        if (current !is SearchUiState.Success) return
+
+        _uiState.value = current.copy(
+            selectedCollection = CollectionDetailState(item = item, isLoading = true)
+        )
+
+        viewModelScope.launch {
+            val result = when (item.type) {
+                SectionItemType.ALBUM -> repository.getAlbumDetails(item.id).map { it.songs }
+                SectionItemType.PLAYLIST, SectionItemType.CHART -> repository.getPlaylistDetails(item.id).map { it.songs }
+            }
+
+            val latest = _uiState.value
+            if (latest is SearchUiState.Success && latest.selectedCollection?.item?.id == item.id) {
+                val songs = result.getOrNull().orEmpty()
+                _uiState.value = latest.copy(
+                    selectedCollection = latest.selectedCollection.copy(
+                        isLoading = false,
+                        songs = songs,
+                        errorMessage = if (songs.isEmpty()) {
+                            result.exceptionOrNull()?.localizedMessage ?: "No tracks found"
+                        } else null
+                    )
+                )
+            }
+        }
+    }
+
+    fun closeCollection() {
+        val current = _uiState.value
+        if (current is SearchUiState.Success) {
+            _uiState.value = current.copy(selectedCollection = null)
+        }
+    }
+
+    fun playCollection(songs: List<Song>, title: String, shuffle: Boolean = false, playerManager: PlayerManager) {
+        if (songs.isEmpty()) return
+        val playlist = if (shuffle) songs.shuffled() else songs
+        playerManager.playSong(playlist.first(), playlist, title)
+    }
+
     fun toggleFavorite(song: Song) {
         viewModelScope.launch {
             val newLiked = repository.toggleFavorite(song)
