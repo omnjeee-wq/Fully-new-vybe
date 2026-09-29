@@ -98,6 +98,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
     val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
+    val dynamicTheme by settingsViewModel.dynamicTheme.collectAsStateWithLifecycle()
 
     VybeTheme(themeMode = themeMode) {
         val shouldOpenPlayer by openPlayerTrigger.collectAsStateWithLifecycle()
