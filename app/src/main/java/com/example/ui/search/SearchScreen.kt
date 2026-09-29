@@ -59,8 +59,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.example.domain.model.SectionItem
 import com.example.domain.model.Song
 import com.example.player.PlayerManager
+import com.example.ui.components.CollectionDetailSheet
+import com.example.ui.home.CollectionDetailState
 import com.example.ui.components.EqualizerWaveformIndicator
 import com.example.ui.theme.VybeBlack
 import com.example.ui.theme.VybeBorder
@@ -130,6 +133,7 @@ fun SearchScreen(
                 SearchResultsContent(
                     query = state.query,
                     songs = state.songs,
+                    collections = state.collections,
                     currentSongId = playerState.currentSong?.id,
                     isPlaying = playerState.isPlaying,
                     onSongClick = { song ->
@@ -152,8 +156,39 @@ fun SearchScreen(
                 },
                     onToggleFavorite = { song ->
                         viewModel.toggleFavorite(song)
+                    },
+                    onCollectionClick = { collection ->
+                        viewModel.openCollection(collection)
                     }
                 )
+
+                state.selectedCollection?.let { collectionState ->
+                    CollectionDetailSheet(
+                        state = collectionState,
+                        currentPlayingSongId = playerState.currentSong?.id,
+                        isPlaying = playerState.isPlaying,
+                        onDismiss = { viewModel.closeCollection() },
+                        onPlaySong = { song, songs ->
+                            playerManager.playSong(song, songs, collectionState.item.title)
+                        },
+                        onPlayAll = { songs ->
+                            viewModel.playCollection(
+                                songs = songs,
+                                title = collectionState.item.title,
+                                playerManager = playerManager
+                            )
+                        },
+                        onShuffle = { songs ->
+                            viewModel.playCollection(
+                                songs = songs,
+                                title = collectionState.item.title,
+                                shuffle = true,
+                                playerManager = playerManager
+                            )
+                        },
+                        onToggleFavorite = { song -> viewModel.toggleFavorite(song) }
+                    )
+                }
             }
             is SearchUiState.Empty -> {
                 SearchEmptyContent(
@@ -432,11 +467,13 @@ private fun SearchHistoryContent(
 private fun SearchResultsContent(
     query: String,
     songs: List<Song>,
+    collections: List<SectionItem>,
     currentSongId: String?,
     isPlaying: Boolean,
     onSongClick: (Song) -> Unit,
     onPlayAll: () -> Unit,
-    onToggleFavorite: (Song) -> Unit
+    onToggleFavorite: (Song) -> Unit,
+    onCollectionClick: (SectionItem) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -444,6 +481,41 @@ private fun SearchResultsContent(
             .testTag("search_results_list"),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 140.dp)
     ) {
+        if (collections.isNotEmpty()) {
+            item(key = "collections_header") {
+                Text(
+                    text = "ALBUMS & PLAYLISTS",
+                    color = VybeTextMuted,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 10.dp)
+                )
+            }
+
+            item(key = "collections_row") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    collections.forEach { collection ->
+                        SearchCollectionCard(
+                            collection = collection,
+                            onClick = { onCollectionClick(collection) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    repeat(3 - collections.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+
+            item(key = "collections_spacer") {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+
         // Summary & Play All Button
         item(key = "results_header") {
             Row(
@@ -513,6 +585,60 @@ private fun SearchResultsContent(
                 onToggleFavorite = { onToggleFavorite(song) }
             )
         }
+    }
+}
+
+@Composable
+private fun SearchCollectionCard(
+    collection: SectionItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(bottom = 6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(92.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(VybeSurfaceVariant)
+        ) {
+            if (collection.artworkUrl.isNotBlank()) {
+                AsyncImage(
+                    model = collection.artworkUrl,
+                    contentDescription = collection.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = VybeOrange,
+                    modifier = Modifier.align(Alignment.Center).size(28.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = collection.title,
+            color = VybeTextPrimary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = collection.subtitle,
+            color = VybeTextSecondary,
+            fontSize = 11.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
