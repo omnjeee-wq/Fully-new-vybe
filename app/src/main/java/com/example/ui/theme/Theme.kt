@@ -1,11 +1,15 @@
 package com.example.ui.theme
 
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 
 private val VybeDarkColorScheme = darkColorScheme(
     primary = VybeOrange,
@@ -28,8 +32,8 @@ private val VybeDarkColorScheme = darkColorScheme(
 private val VybeLightColorScheme = lightColorScheme(
     primary = VybeOrange,
     onPrimary = Color.White,
-    primaryContainer = VybeSurfaceVariant,
-    onPrimaryContainer = VybeOrange,
+    primaryContainer = Color(0xFFFFE5DD),
+    onPrimaryContainer = Color(0xFF8A2100),
     secondary = VybeCoral,
     onSecondary = Color.White,
     tertiary = VybeElectricCyan,
@@ -46,20 +50,38 @@ private val VybeLightColorScheme = lightColorScheme(
 @Composable
 fun VybeTheme(
     themeMode: String = "Dark",
+    dynamicTheme: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when (themeMode) {
-        "Light" -> VybeLightColorScheme
+    val context = LocalContext.current
 
-        "System" -> {
-            if (isSystemInDarkTheme()) {
-                VybeDarkColorScheme
-            } else {
-                VybeLightColorScheme
-            }
+    val isDark = when (themeMode) {
+        "Light" -> false
+        "System" -> isSystemInDarkTheme()
+        else -> true
+    }
+
+    val colorScheme = if (
+        dynamicTheme &&
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    ) {
+        if (isDark) {
+            dynamicDarkColorScheme(context)
+        } else {
+            dynamicLightColorScheme(context)
         }
-
-        else -> VybeDarkColorScheme
+    } else {
+        when (themeMode) {
+            "Light" -> VybeLightColorScheme
+            "System" -> {
+                if (isSystemInDarkTheme()) {
+                    VybeDarkColorScheme
+                } else {
+                    VybeLightColorScheme
+                }
+            }
+            else -> VybeDarkColorScheme
+        }
     }
 
     MaterialTheme(
