@@ -238,10 +238,15 @@ fun PlayerScreen(
         }
     }
 
-    val isDownloaded by (
+    val isDownloaded by remember(currentSong?.id) {
         currentSong?.let { VybeApp.instance.repository.isSongDownloaded(it.id) }
             ?: flowOf(false)
-        ).collectAsStateWithLifecycle(false)
+    }.collectAsStateWithLifecycle(false)
+
+    val isLiked by remember(currentSong?.id) {
+        currentSong?.let { VybeApp.instance.repository.isFavorite(it.id) }
+            ?: flowOf(false)
+    }.collectAsStateWithLifecycle(currentSong?.isLiked ?: false)
 
     val userPlaylists by VybeApp.instance.repository.getUserPlaylists()
         .collectAsStateWithLifecycle(emptyList())
@@ -529,14 +534,14 @@ fun PlayerScreen(
                         .testTag("player_favorite_button")
                 ) {
                     Icon(
-                        imageVector = if (currentSong?.isLiked == true) {
+                        imageVector = if (isLiked) {
                             Icons.Default.Favorite
                         } else {
                             Icons.Default.FavoriteBorder
                         },
                         contentDescription = "Favorite",
-                        tint = if (currentSong?.isLiked == true) {
-                            VybeCoral
+                        tint = if (isLiked) {
+                            Color.Red
                         } else {
                             VybeTextSecondary
                         },

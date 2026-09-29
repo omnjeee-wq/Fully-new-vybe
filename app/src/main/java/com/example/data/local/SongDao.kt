@@ -31,6 +31,12 @@ interface SongDao {
     @Query("UPDATE song_history SET isLiked = :isLiked WHERE songId = :songId")
     suspend fun updateLikedInHistory(songId: String, isLiked: Boolean)
 
+    @Query("DELETE FROM song_history")
+    suspend fun clearAllSongHistory()
+
+    @Query("SELECT COUNT(*) FROM song_history")
+    fun getSongHistoryCountFlow(): Flow<Int>
+
     // Favorites
     @Query("SELECT * FROM favorite_songs ORDER BY addedTimestamp DESC")
     fun getAllFavorites(): Flow<List<FavoriteSongEntity>>
@@ -171,4 +177,52 @@ interface SongDao {
 
     @Query("DELETE FROM liked_playlists WHERE playlistId = :playlistId")
     suspend fun removeLikedPlaylist(playlistId: String)
+
+    // -------------------------------------------------------------
+    // Backup & Restore Synchronization Helpers
+    // -------------------------------------------------------------
+    @Query("SELECT * FROM song_history ORDER BY lastPlayedTimestamp DESC")
+    suspend fun getAllHistorySync(): List<SongHistoryEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertHistoryList(history: List<SongHistoryEntity>)
+
+    @Query("SELECT * FROM favorite_songs ORDER BY addedTimestamp DESC")
+    suspend fun getAllFavoritesSync(): List<FavoriteSongEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFavoritesList(favorites: List<FavoriteSongEntity>)
+
+    @Query("SELECT * FROM favorite_albums ORDER BY addedTimestamp DESC")
+    suspend fun getAllFavoriteAlbumsSync(): List<FavoriteAlbumEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFavoriteAlbumsList(albums: List<FavoriteAlbumEntity>)
+
+    @Query("SELECT * FROM user_playlists ORDER BY createdTimestamp DESC")
+    suspend fun getAllUserPlaylistsSync(): List<UserPlaylistEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertUserPlaylistsList(playlists: List<UserPlaylistEntity>)
+
+    @Query("SELECT * FROM user_playlist_songs ORDER BY addedTimestamp ASC")
+    suspend fun getAllUserPlaylistSongsSync(): List<UserPlaylistSongEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertUserPlaylistSongsList(songs: List<UserPlaylistSongEntity>)
+
+    @Query("SELECT * FROM liked_playlists ORDER BY addedTimestamp DESC")
+    suspend fun getAllLikedPlaylistsSync(): List<LikedPlaylistEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLikedPlaylistsList(playlists: List<LikedPlaylistEntity>)
+
+    @Query("SELECT * FROM app_preferences")
+    suspend fun getAllPreferencesSync(): List<AppPreferenceEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPreferencesList(prefs: List<AppPreferenceEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSearchHistoryList(searches: List<SearchHistoryEntity>)
 }

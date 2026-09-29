@@ -748,7 +748,7 @@ private fun SearchSongRow(
             Icon(
                 imageVector = if (song.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                 contentDescription = "Toggle favorite",
-                tint = if (song.isLiked) VybePink else VybeTextMuted,
+                tint = if (song.isLiked) Color.Red else VybeTextMuted,
                 modifier = Modifier.size(20.dp)
             )
         }

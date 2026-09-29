@@ -26,10 +26,19 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import android.content.Context
+import android.net.Uri
+import android.util.Log
+import com.example.VybeApp
+import java.io.File
+import java.util.concurrent.TimeUnit
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 class MusicRepositoryImpl(
     private val apiService: JioSaavnApiService,
-    private val songDao: SongDao
+    private val songDao: SongDao,
+    private val context: Context = VybeApp.instance
 ) : MusicRepository {
 
     // In-memory cache for Home sections
@@ -509,9 +518,29 @@ class MusicRepositoryImpl(
     }
 
     // Downloads
+    private fun getAudioFile(songId: String): File {
+        val dir = File(context.filesDir, "downloads")
+        if (!dir.exists()) {
+            dir.mkdirs()
+        }
+        return File(dir, "$songId.m4a")
+    }
+
+    private val downloadHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build()
+    }
+
     override fun getDownloadedSongs(): Flow<List<Song>> {
         return songDao.getAllDownloadedSongs().map { list ->
-            list.map {
+            list.filter { entity ->
+                val file = getAudioFile(entity.songId)
+                file.exists() && file.length() > 0
+            }.map {
                 Song(
                     id = it.songId,
                     title = it.title,
@@ -526,16 +555,25 @@ class MusicRepositoryImpl(
     }
 
     override fun isSongDownloaded(songId: String): Flow<Boolean> {
-        return songDao.isSongDownloadedFlow(songId)
+        return songDao.isSongDownloadedFlow(songId).map { inDb ->
+            inDb && getAudioFile(songId).let { it.exists() && it.length() > 0 }
+        }
     }
 
     override suspend fun toggleDownloadSong(song: Song): Boolean = withContext(Dispatchers.IO) {
-        val downloaded = songDao.isSongDownloaded(song.id)
-        if (downloaded) {
+        val targetFile = getAudioFile(song.id)
+        val isDownloadedInDb = songDao.isSongDownloaded(song.id)
+
+        // If currently downloaded in DB and the local file exists, remove the download
+        if (isDownloadedInDb && targetFile.exists() && targetFile.length() > 0) {
+            targetFile.delete()
             songDao.removeDownloadedSong(song.id)
-            false
-        } else {
-            val estimatedBytes = (song.durationSeconds * 32_000L).coerceAtLeast(3_800_000L)
+            return@withContext false
+        }
+
+        // If the app already has a valid downloaded file, do not unnecessarily download it again
+        if (targetFile.exists() && targetFile.length() > 0) {
+            val sizeBytes = targetFile.length()
             songDao.addDownloadedSong(
                 DownloadedSongEntity(
                     songId = song.id,
@@ -543,20 +581,131 @@ class MusicRepositoryImpl(
                     artist = song.artist,
                     album = song.album,
                     artworkUrl = song.artworkUrl,
-                    streamUrl = song.streamUrl,
+                    streamUrl = Uri.fromFile(targetFile).toString(),
                     durationSeconds = song.durationSeconds,
-                    sizeBytes = estimatedBytes
+                    sizeBytes = sizeBytes,
+                    downloadTimestamp = System.currentTimeMillis()
                 )
             )
-            true
+            return@withContext true
+        }
+
+        // If DB had a stale record but no file, clean it up
+        if (isDownloadedInDb) {
+            songDao.removeDownloadedSong(song.id)
+        }
+
+        // 1. Resolve audio stream URL
+        var audioUrl = song.streamUrl
+        if (audioUrl.isBlank() || audioUrl.startsWith("file://") || audioUrl.startsWith("/")) {
+            val freshSong = getSongById(song.id).getOrNull()
+            if (freshSong != null && freshSong.streamUrl.isNotBlank()) {
+                audioUrl = freshSong.streamUrl
+            }
+        }
+
+        if (audioUrl.isBlank() || audioUrl.startsWith("file://") || audioUrl.startsWith("/")) {
+            return@withContext false
+        }
+
+        if (audioUrl.startsWith("http://")) {
+            audioUrl = audioUrl.replaceFirst("http://", "https://")
+        }
+
+        // 2. Start actual audio file download into a temporary file
+        val tempFile = File(targetFile.parentFile, "${song.id}.tmp")
+        if (tempFile.exists()) {
+            tempFile.delete()
+        }
+
+        try {
+            val request = Request.Builder()
+                .url(audioUrl)
+                .header("User-Agent", "VYBE-Android/1.0")
+                .build()
+
+            val response = downloadHttpClient.newCall(request).execute()
+            if (!response.isSuccessful) {
+                response.close()
+                tempFile.delete()
+                return@withContext false
+            }
+
+            val body = response.body ?: run {
+                response.close()
+                tempFile.delete()
+                return@withContext false
+            }
+
+            tempFile.outputStream().use { output ->
+                body.byteStream().use { input ->
+                    input.copyTo(output)
+                }
+            }
+            response.close()
+
+            // 3. Verify downloaded file exists and is non-empty
+            if (tempFile.exists() && tempFile.length() > 0) {
+                if (targetFile.exists()) {
+                    targetFile.delete()
+                }
+                val movedSuccessfully = try {
+                    tempFile.copyTo(targetFile, overwrite = true)
+                    tempFile.delete()
+                    targetFile.exists() && targetFile.length() > 0
+                } catch (e: Exception) {
+                    tempFile.renameTo(targetFile) && targetFile.exists() && targetFile.length() > 0
+                }
+
+                if (!movedSuccessfully) {
+                    tempFile.delete()
+                    targetFile.delete()
+                    return@withContext false
+                }
+
+                // 4. Save/update downloaded-song record in Room ONLY AFTER file exists
+                val sizeBytes = targetFile.length()
+                songDao.addDownloadedSong(
+                    DownloadedSongEntity(
+                        songId = song.id,
+                        title = song.title,
+                        artist = song.artist,
+                        album = song.album,
+                        artworkUrl = song.artworkUrl,
+                        streamUrl = Uri.fromFile(targetFile).toString(),
+                        durationSeconds = song.durationSeconds,
+                        sizeBytes = sizeBytes,
+                        downloadTimestamp = System.currentTimeMillis()
+                    )
+                )
+                return@withContext true
+            } else {
+                tempFile.delete()
+                return@withContext false
+            }
+        } catch (e: Exception) {
+            Log.e("MusicRepository", "Failed to download song ${song.id}: ${e.message}")
+            tempFile.delete()
+            if (targetFile.exists() && targetFile.length() == 0L) {
+                targetFile.delete()
+            }
+            return@withContext false
         }
     }
 
     override suspend fun removeDownloadedSong(songId: String) = withContext(Dispatchers.IO) {
+        val file = getAudioFile(songId)
+        if (file.exists()) {
+            file.delete()
+        }
         songDao.removeDownloadedSong(songId)
     }
 
     override suspend fun clearAllDownloads() = withContext(Dispatchers.IO) {
+        val dir = File(context.filesDir, "downloads")
+        if (dir.exists()) {
+            dir.listFiles()?.forEach { it.delete() }
+        }
         songDao.clearAllDownloadedSongs()
     }
 

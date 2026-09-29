@@ -35,6 +35,8 @@ import com.example.ui.placeholder.PlaceholderScreen
 import com.example.ui.player.PlayerScreen
 import com.example.ui.search.SearchScreen
 import com.example.ui.search.SearchViewModel
+import com.example.ui.settings.SettingsScreen
+import com.example.ui.settings.SettingsViewModel
 import com.example.ui.theme.VybeBlack
 import kotlinx.coroutines.launch
 
@@ -43,6 +45,7 @@ fun MainAppScaffold(
     homeViewModel: HomeViewModel,
     searchViewModel: SearchViewModel,
     libraryViewModel: LibraryViewModel,
+    settingsViewModel: SettingsViewModel,
     playerManager: PlayerManager,
     modifier: Modifier = Modifier,
     initialOpenPlayer: Boolean = false,
@@ -109,8 +112,8 @@ fun MainAppScaffold(
                     )
                 }
                 NavDestination.SETTINGS -> {
-                    PlaceholderScreen(
-                        destination = destination
+                    SettingsScreen(
+                        viewModel = settingsViewModel
                     )
                 }
             }

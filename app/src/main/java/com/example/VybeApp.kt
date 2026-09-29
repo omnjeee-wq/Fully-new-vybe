@@ -1,12 +1,16 @@
 package com.example
 
 import android.app.Application
+import com.example.data.drive.GoogleDriveManager
 import com.example.data.local.VybeDatabase
 import com.example.data.remote.RetrofitClient
 import com.example.data.repository.MusicRepositoryImpl
 import com.example.domain.recommendation.RecommendationEngine
 import com.example.domain.repository.MusicRepository
 import com.example.player.PlayerManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 class VybeApp : Application() {
 
@@ -22,6 +26,9 @@ class VybeApp : Application() {
     lateinit var playerManager: PlayerManager
         private set
 
+    lateinit var driveManager: GoogleDriveManager
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -30,6 +37,11 @@ class VybeApp : Application() {
         repository = MusicRepositoryImpl(RetrofitClient.apiService, database.songDao())
         recommendationEngine = RecommendationEngine(repository, database.songDao())
         playerManager = PlayerManager.initialize(this, repository)
+        driveManager = GoogleDriveManager(
+            context = this,
+            database = database,
+            coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+        )
     }
 
     companion object {

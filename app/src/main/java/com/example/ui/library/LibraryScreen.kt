@@ -917,7 +917,7 @@ private fun PlaylistsTabContent(
                                     Icon(
                                         imageVector = Icons.Default.Favorite,
                                         contentDescription = "Liked",
-                                        tint = VybePink,
+                                        tint = Color.Red,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -1102,7 +1102,7 @@ private fun PlaylistsTabContent(
                         Icon(
                             imageVector = Icons.Default.Favorite,
                             contentDescription = "Unlike",
-                            tint = VybePink,
+                            tint = Color.Red,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -1218,7 +1218,7 @@ private fun LikedAlbumsContent(
                         Icon(
                             imageVector = Icons.Default.Favorite,
                             contentDescription = "Unlike Album",
-                            tint = VybePink,
+                            tint = Color.Red,
                             modifier = Modifier.size(20.dp)
                         )
                     }

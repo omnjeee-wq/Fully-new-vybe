@@ -27,6 +27,7 @@ import com.example.ui.home.HomeViewModel
 import com.example.ui.library.LibraryViewModel
 import com.example.ui.navigation.MainAppScaffold
 import com.example.ui.search.SearchViewModel
+import com.example.ui.settings.SettingsViewModel
 import com.example.ui.theme.VybeBlack
 import com.example.ui.theme.VybeTheme
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -74,6 +75,20 @@ class MainActivity : ComponentActivity() {
         })[LibraryViewModel::class.java]
     }
 
+    private val settingsViewModel: SettingsViewModel by lazy {
+        val app = VybeApp.instance
+        ViewModelProvider(this, object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return SettingsViewModel(
+                    driveManager = app.driveManager,
+                    songDao = app.database.songDao(),
+                    appContext = applicationContext
+                ) as T
+            }
+        })[SettingsViewModel::class.java]
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -112,6 +127,7 @@ class MainActivity : ComponentActivity() {
                         homeViewModel = homeViewModel,
                         searchViewModel = searchViewModel,
                         libraryViewModel = libraryViewModel,
+                        settingsViewModel = settingsViewModel,
                         playerManager = app.playerManager,
                         initialOpenPlayer = shouldOpenPlayer,
                         onPlayerOpenedHandled = { openPlayerTrigger.value = false }

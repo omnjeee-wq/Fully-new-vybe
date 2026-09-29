@@ -286,7 +286,7 @@ private fun RecommendSongItem(
                         Icon(
                             if (song.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = null,
-                            tint = VybeCoral
+                            tint = if (song.isLiked) Color.Red else VybeCoral
                         )
                     },
                     onClick = {

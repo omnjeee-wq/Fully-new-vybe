@@ -178,7 +178,7 @@ fun CollectionDetailSheet(
                                         Icon(
                                             imageVector = if (isCollectionFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                             contentDescription = "Like collection",
-                                            tint = if (isCollectionFavorite) VybePink else Color.White
+                                            tint = if (isCollectionFavorite) Color.Red else Color.White
                                         )
                                     }
                                 }
@@ -457,7 +457,7 @@ private fun TrackRow(
             Icon(
                 imageVector = if (song.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                 contentDescription = "Favorite",
-                tint = if (song.isLiked) VybePink else VybeTextMuted,
+                tint = if (song.isLiked) Color.Red else VybeTextMuted,
                 modifier = Modifier.size(18.dp)
             )
         }

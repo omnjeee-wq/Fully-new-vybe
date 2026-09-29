@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import com.example.VybeApp
+import java.io.File
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -680,9 +682,20 @@ fun Song.toMediaItem(): MediaItem {
         })
         .build()
 
+    val playableUri = if (streamUrl.startsWith("file://") || streamUrl.startsWith("/")) {
+        Uri.parse(streamUrl)
+    } else {
+        val localFile = File(VybeApp.instance.filesDir, "downloads/$id.m4a")
+        if (localFile.exists() && localFile.length() > 0) {
+            Uri.fromFile(localFile)
+        } else {
+            Uri.parse(streamUrl)
+        }
+    }
+
     return MediaItem.Builder()
         .setMediaId(id)
-        .setUri(streamUrl)
+        .setUri(playableUri)
         .setMediaMetadata(metadata)
         .build()
 }
