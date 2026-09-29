@@ -32,12 +32,16 @@ import com.example.ui.home.HomeViewModel
 import com.example.ui.library.LibraryScreen
 import com.example.ui.library.LibraryViewModel
 import com.example.ui.placeholder.PlaceholderScreen
+import androidx.compose.ui.platform.LocalContext
+import com.example.ui.library.LibraryTab
+import com.example.ui.offline.OfflineScreen
 import com.example.ui.player.PlayerScreen
 import com.example.ui.search.SearchScreen
 import com.example.ui.search.SearchViewModel
 import com.example.ui.settings.SettingsScreen
 import com.example.ui.settings.SettingsViewModel
 import com.example.ui.theme.VybeBlack
+import com.example.util.NetworkMonitor
 import kotlinx.coroutines.launch
 
 @Composable
@@ -52,8 +56,16 @@ fun MainAppScaffold(
     onPlayerOpenedHandled: () -> Unit = {}
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val networkMonitor = remember { NetworkMonitor(context) }
+    val isOnline by networkMonitor.isOnline.collectAsStateWithLifecycle(initialValue = networkMonitor.isCurrentlyOnline())
+
     var currentDestination by remember { mutableStateOf(NavDestination.HOME) }
     var isPlayerExpanded by remember { mutableStateOf(initialOpenPlayer) }
+    var previousDestinationBeforeOffline by remember { mutableStateOf<NavDestination?>(null) }
+    var isViewingDownloadsOffline by remember { mutableStateOf(false) }
+
+    val showOfflineScreen = !isOnline && !isViewingDownloadsOffline
 
     val playerState by playerManager.playerState.collectAsStateWithLifecycle()
 
@@ -64,8 +76,29 @@ fun MainAppScaffold(
         }
     }
 
+    // Automatically manage transition when connectivity changes
+    LaunchedEffect(isOnline) {
+        if (!isOnline) {
+            if (previousDestinationBeforeOffline == null) {
+                previousDestinationBeforeOffline = currentDestination
+            }
+        } else {
+            val previous = previousDestinationBeforeOffline
+            if (previous != null) {
+                currentDestination = previous
+                previousDestinationBeforeOffline = null
+            }
+            isViewingDownloadsOffline = false
+        }
+    }
+
+    // Handle back button while viewing downloads offline
+    BackHandler(enabled = !isOnline && isViewingDownloadsOffline && !isPlayerExpanded) {
+        isViewingDownloadsOffline = false
+    }
+
     // Handle system back press
-    BackHandler(enabled = isPlayerExpanded || currentDestination != NavDestination.HOME) {
+    BackHandler(enabled = isPlayerExpanded || (currentDestination != NavDestination.HOME && !showOfflineScreen && !isViewingDownloadsOffline)) {
         if (isPlayerExpanded) {
             isPlayerExpanded = false
         } else {
@@ -121,7 +154,7 @@ fun MainAppScaffold(
 
         // Floating Bottom Navigation + Mini-Player
         AnimatedVisibility(
-            visible = !isPlayerExpanded,
+            visible = !isPlayerExpanded && !showOfflineScreen,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter)
@@ -129,7 +162,13 @@ fun MainAppScaffold(
             FloatingBottomBar(
                 currentDestination = currentDestination,
                 playerState = playerState,
-                onNavigate = { currentDestination = it },
+                onNavigate = { destination ->
+                    if (!isOnline && destination != NavDestination.LIBRARY) {
+                        isViewingDownloadsOffline = false
+                    } else {
+                        currentDestination = destination
+                    }
+                },
                 onOpenFullPlayer = { isPlayerExpanded = true },
                 onPlayPause = { playerManager.togglePlayPause() },
                 onNext = { playerManager.next() }
@@ -150,6 +189,22 @@ fun MainAppScaffold(
                     coroutineScope.launch {
                         VybeApp.instance.repository.toggleFavorite(song)
                     }
+                }
+            )
+        }
+
+        // Dedicated Full-Screen Offline Screen
+        AnimatedVisibility(
+            visible = showOfflineScreen && !isPlayerExpanded,
+            enter = fadeIn(animationSpec = tween(durationMillis = 280)),
+            exit = fadeOut(animationSpec = tween(durationMillis = 220)),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            OfflineScreen(
+                onNavigateToDownloads = {
+                    isViewingDownloadsOffline = true
+                    currentDestination = NavDestination.LIBRARY
+                    libraryViewModel.selectTab(LibraryTab.DOWNLOADS)
                 }
             )
         }
