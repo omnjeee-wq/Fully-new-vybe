@@ -5,6 +5,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.foundation.isSystemInDarkTheme
+
 
 private val VybeColorScheme = lightColorScheme (
     primary = VybeOrange,
@@ -31,10 +33,15 @@ fun VybeTheme(
 ) {
     val colorScheme = when (themeMode) {
         "Light" -> VybeLightColorScheme
+
         "System" -> {
-            val isDark = androidx.compose.foundation.isSystemInDarkTheme()
-            if (isDark) VybeColorScheme else VybeLightColorScheme
+            if (isSystemInDarkTheme()) {
+                VybeColorScheme
+            } else {
+                VybeLightColorScheme
+            }
         }
+
         else -> VybeColorScheme
     }
 
