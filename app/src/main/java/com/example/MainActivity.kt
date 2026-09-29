@@ -97,10 +97,12 @@ class MainActivity : ComponentActivity() {
         val app = VybeApp.instance
 
         setContent {
-            VybeTheme {
-                val shouldOpenPlayer by openPlayerTrigger.collectAsStateWithLifecycle()
+    val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
 
-                // Request notification permission on Android 13+
+    VybeTheme(themeMode = themeMode) {
+        val shouldOpenPlayer by openPlayerTrigger.collectAsStateWithLifecycle()
+
+        
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     val permissionLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.RequestPermission()
