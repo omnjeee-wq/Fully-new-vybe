@@ -73,6 +73,7 @@ import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -171,11 +172,36 @@ fun SettingsScreen(
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
+        if (result.data != null) {
             viewModel.handleSignInResult(result.data)
         } else {
             viewModel.clearStatus()
         }
+    }
+
+    val userRecoverableAuthIntent by viewModel.userRecoverableAuthIntent.collectAsStateWithLifecycle()
+    val authRecoveryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        viewModel.onAuthRecoveryResult(result.resultCode == Activity.RESULT_OK)
+    }
+
+    LaunchedEffect(userRecoverableAuthIntent) {
+        userRecoverableAuthIntent?.let { intent ->
+            authRecoveryLauncher.launch(intent)
+        }
+    }
+
+    val exportBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let { viewModel.exportBackupToUri(it) }
+    }
+
+    val importBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.importBackupFromUri(it) }
     }
 
     Box(
@@ -215,12 +241,16 @@ fun SettingsScreen(
                             val intent = viewModel.getSignInIntent()
                             googleSignInLauncher.launch(intent)
                         },
+                        onConnectLocalClick = { viewModel.connectLocalSyncStorage() },
                         onDisconnectClick = { viewModel.disconnectGoogleDrive() },
                         onBackupNow = { viewModel.backupNow() },
                         onRestoreBackup = { viewModel.restoreData() },
                         onAutoBackupChange = { viewModel.setAutoBackup(it) },
                         onDismissStatus = { viewModel.clearStatus() },
-                        onRefreshMetadata = { viewModel.refreshBackupMetadata() }
+                        onRefreshMetadata = { viewModel.refreshBackupMetadata() },
+                        onExportClick = { exportBackupLauncher.launch("vybe_backup.json") },
+                        onImportClick = { importBackupLauncher.launch(arrayOf("application/json", "text/*", "*/*")) },
+                        onFallbackToLocal = { viewModel.connectLocalSyncStorage() }
                     )
                 }
 
@@ -1020,12 +1050,16 @@ private fun AccountSyncCard(
     isCheckingBackup: Boolean,
     autoBackup: Boolean,
     onConnectClick: () -> Unit,
+    onConnectLocalClick: () -> Unit,
     onDisconnectClick: () -> Unit,
     onBackupNow: () -> Unit,
     onRestoreBackup: () -> Unit,
     onAutoBackupChange: (Boolean) -> Unit,
     onDismissStatus: () -> Unit,
-    onRefreshMetadata: () -> Unit
+    onRefreshMetadata: () -> Unit,
+    onExportClick: () -> Unit,
+    onImportClick: () -> Unit,
+    onFallbackToLocal: () -> Unit
 ) {
     SettingsCard {
         // Status Alerts Banner
@@ -1037,7 +1071,8 @@ private fun AccountSyncCard(
             SyncStatusBanner(
                 status = syncStatus,
                 onDismiss = onDismissStatus,
-                onRetry = onBackupNow
+                onRetry = onBackupNow,
+                onFallbackToLocal = onFallbackToLocal
             )
             Spacer(modifier = Modifier.height(14.dp))
         }
@@ -1067,15 +1102,24 @@ private fun AccountSyncCard(
                             modifier = Modifier
                                 .size(42.dp)
                                 .clip(CircleShape)
-                                .background(VybeOrange.copy(alpha = 0.2f)),
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = accountInfo.displayName.take(1).uppercase(),
-                                color = VybeOrange,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            if (accountInfo.isLocalSync) {
+                                Icon(
+                                    imageVector = Icons.Default.Storage,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            } else {
+                                Text(
+                                    text = accountInfo.displayName.take(1).uppercase(),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
 
@@ -1084,7 +1128,7 @@ private fun AccountSyncCard(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = accountInfo.displayName,
-                            color = VybeTextPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -1092,7 +1136,7 @@ private fun AccountSyncCard(
                         )
                         Text(
                             text = accountInfo.email,
-                            color = VybeTextMuted,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -1106,7 +1150,7 @@ private fun AccountSyncCard(
                             )
                             Spacer(modifier = Modifier.width(5.dp))
                             Text(
-                                text = "Connected to Google Drive",
+                                text = if (accountInfo.isLocalSync) "Device Sync Storage (Active)" else "Connected to Google Drive",
                                 color = Color(0xFF10B981),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium
@@ -1117,7 +1161,7 @@ private fun AccountSyncCard(
 
                 TextButton(
                     onClick = onDisconnectClick,
-                    colors = ButtonDefaults.textButtonColors(contentColor = VybeTextMuted)
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
                 ) {
                     Text(text = "Disconnect", fontSize = 12.sp)
                 }
@@ -1126,40 +1170,81 @@ private fun AccountSyncCard(
             // Not connected state
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Connect Google Drive",
-                    color = VybeTextPrimary,
+                    text = "Connect Google Drive & Sync Storage",
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Back up your playlists, favorites, and settings securely into your private Google Drive app storage.",
-                    color = VybeTextMuted,
+                    text = "Back up your playlists, favorites, and settings securely into Google Drive or private device sync storage.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp,
                     lineHeight = 17.sp
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                Button(
-                    onClick = onConnectClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("btn_connect_drive"),
-                    colors = ButtonDefaults.buttonColors(containerColor = VybeOrange)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = onConnectClick,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("btn_connect_drive"),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Cloud,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Google Drive",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = onConnectLocalClick,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("btn_connect_local"),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Storage,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Device Storage",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                TextButton(
+                    onClick = onImportClick,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Cloud,
+                        imageVector = Icons.Default.CloudDownload,
                         contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(14.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Connect Google Drive",
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "Import Existing Backup (.json)", fontSize = 12.sp)
                 }
             }
         }
@@ -1177,7 +1262,7 @@ private fun AccountSyncCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Last Backup",
-                    color = VybeTextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -1186,20 +1271,25 @@ private fun AccountSyncCard(
                     val dateStr = DateFormat.format("MMM d, yyyy, h:mm a", Date(backupSummary.modifiedTime)).toString()
                     Text(
                         text = "$dateStr (${backupSummary.totalSongs} songs, ${backupSummary.totalPlaylists} playlists)",
-                        color = VybeOrange,
+                        color = MaterialTheme.colorScheme.primary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "Source: ${backupSummary.source}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
                     )
                 } else if (isCheckingBackup) {
                     Text(
                         text = "Checking backup status...",
-                        color = VybeTextMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
                     )
                 } else {
                     Text(
                         text = "Your data hasn't been backed up yet.",
-                        color = VybeTextMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
                     )
                 }
@@ -1210,7 +1300,7 @@ private fun AccountSyncCard(
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Refresh",
-                        tint = VybeTextSecondary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -1230,7 +1320,7 @@ private fun AccountSyncCard(
                     modifier = Modifier
                         .weight(1f)
                         .testTag("btn_backup_now"),
-                    colors = ButtonDefaults.buttonColors(containerColor = VybeOrange),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     enabled = syncStatus !is SyncStatus.BackingUp && syncStatus !is SyncStatus.Restoring
                 ) {
                     Icon(
@@ -1247,7 +1337,7 @@ private fun AccountSyncCard(
                     modifier = Modifier
                         .weight(1f)
                         .testTag("btn_restore_backup"),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = VybeTextPrimary),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
                     enabled = backupSummary != null && syncStatus !is SyncStatus.BackingUp && syncStatus !is SyncStatus.Restoring
                 ) {
                     Icon(
@@ -1257,6 +1347,33 @@ private fun AccountSyncCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(text = "Restore", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TextButton(
+                    onClick = onExportClick,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "Export JSON", fontSize = 12.sp)
+                }
+
+                TextButton(
+                    onClick = onImportClick,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
+                ) {
+                    Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "Import JSON", fontSize = 12.sp)
                 }
             }
         }
@@ -1278,7 +1395,8 @@ private fun AccountSyncCard(
 private fun SyncStatusBanner(
     status: SyncStatus,
     onDismiss: () -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onFallbackToLocal: () -> Unit
 ) {
     val (bgColor, borderColor, icon, text) = when (status) {
         is SyncStatus.Connecting -> Quad(
@@ -1326,7 +1444,7 @@ private fun SyncStatusBanner(
                         CircularProgressIndicator(
                             modifier = Modifier.size(16.dp),
                             strokeWidth = 2.dp,
-                            color = VybeOrange
+                            color = MaterialTheme.colorScheme.primary
                         )
                     } else {
                         Icon(
@@ -1339,7 +1457,7 @@ private fun SyncStatusBanner(
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = text,
-                        color = VybeTextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -1349,8 +1467,30 @@ private fun SyncStatusBanner(
                     Icon(
                         imageVector = Icons.Outlined.Close,
                         contentDescription = "Dismiss",
-                        tint = VybeTextMuted,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+
+            if (status is SyncStatus.Error && status.canFallbackToLocal) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = onFallbackToLocal,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Storage,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Use Device Sync Storage (Instant Offline)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -1362,7 +1502,7 @@ private fun SyncStatusBanner(
                         .fillMaxWidth()
                         .height(3.dp)
                         .clip(RoundedCornerShape(2.dp)),
-                    color = VybeOrange,
+                    color = MaterialTheme.colorScheme.primary,
                     trackColor = VybeSurfaceVariant
                 )
             }

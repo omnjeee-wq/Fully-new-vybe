@@ -2,6 +2,8 @@ package com.example.ui.settings
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import coil.Coil
@@ -40,6 +42,7 @@ class SettingsViewModel(
     val syncStatus: StateFlow<SyncStatus> = driveManager.syncStatus
     val lastBackupSummary: StateFlow<DriveBackupSummary?> = driveManager.lastBackupSummary
     val isCheckingBackup: StateFlow<Boolean> = driveManager.isCheckingBackup
+    val userRecoverableAuthIntent: StateFlow<Intent?> = driveManager.userRecoverableAuthIntent
 
     private val _autoBackup = MutableStateFlow(false)
     val autoBackup: StateFlow<Boolean> = _autoBackup.asStateFlow()
@@ -225,15 +228,40 @@ class SettingsViewModel(
     fun setAutoBackup(enabled: Boolean) {
         _autoBackup.value = enabled
         persistPreference("pref_auto_backup", enabled.toString())
+        if (enabled) {
+            driveManager.triggerAutoBackup()
+        }
     }
 
     fun getSignInIntent(): Intent = driveManager.getSignInIntent()
     fun handleSignInResult(data: Intent?) = driveManager.handleSignInResult(data)
+    fun connectLocalSyncStorage() = driveManager.connectLocalSyncStorage()
+    fun onAuthRecoveryResult(granted: Boolean) = driveManager.onAuthRecoveryResult(granted)
     fun disconnectGoogleDrive() = driveManager.disconnect()
     fun backupNow() = driveManager.backupNow()
     fun restoreData() = driveManager.restoreData()
     fun clearStatus() = driveManager.clearStatus()
     fun refreshBackupMetadata() = driveManager.refreshBackupMetadata()
+
+    fun exportBackupToUri(uri: Uri) {
+        try {
+            appContext.contentResolver.openOutputStream(uri)?.let { stream ->
+                driveManager.exportBackup(stream)
+            }
+        } catch (e: Exception) {
+            Log.e("SettingsViewModel", "Failed to export backup to URI", e)
+        }
+    }
+
+    fun importBackupFromUri(uri: Uri) {
+        try {
+            appContext.contentResolver.openInputStream(uri)?.let { stream ->
+                driveManager.importBackup(stream)
+            }
+        } catch (e: Exception) {
+            Log.e("SettingsViewModel", "Failed to import backup from URI", e)
+        }
+    }
 
     // --- Appearance actions ---
     fun setThemeMode(mode: String) {

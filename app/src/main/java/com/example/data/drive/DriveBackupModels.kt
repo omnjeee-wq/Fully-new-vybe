@@ -42,7 +42,8 @@ data class VybeBackupData(
 data class DriveAccountInfo(
     val email: String,
     val displayName: String,
-    val photoUrl: String? = null
+    val photoUrl: String? = null,
+    val isLocalSync: Boolean = false
 )
 
 data class DriveBackupSummary(
@@ -51,7 +52,8 @@ data class DriveBackupSummary(
     val sizeBytes: Long,
     val totalSongs: Int,
     val totalPlaylists: Int,
-    val totalHistory: Int
+    val totalHistory: Int,
+    val source: String = "Google Drive"
 )
 
 sealed interface SyncStatus {
@@ -60,5 +62,9 @@ sealed interface SyncStatus {
     data class BackingUp(val message: String = "Backing up your data to Google Drive...") : SyncStatus
     data class Restoring(val message: String = "Restoring your data from Google Drive...") : SyncStatus
     data class Success(val message: String, val timestamp: Long = System.currentTimeMillis()) : SyncStatus
-    data class Error(val message: String, val isAuthError: Boolean = false) : SyncStatus
+    data class Error(
+        val message: String,
+        val isAuthError: Boolean = false,
+        val canFallbackToLocal: Boolean = false
+    ) : SyncStatus
 }

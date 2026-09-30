@@ -8,6 +8,7 @@ import com.google.android.gms.auth.GoogleAuthUtil
 import com.google.android.gms.auth.UserRecoverableAuthException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -75,14 +76,15 @@ class GoogleDriveService(
      * Searches for an existing vybe_backup.json file inside the app-specific folder (appDataFolder).
      */
     suspend fun findExistingBackup(): DriveFileInfo? = executeWithRetry { token ->
-        val url = "https://www.googleapis.com/drive/v3/files" +
-                "?spaces=appDataFolder" +
-                "&q=name%3D'$BACKUP_FILE_NAME'+and+trashed%3Dfalse" +
-                "&fields=files(id,name,modifiedTime,size)" +
-                "&pageSize=1"
+        val httpUrl = "https://www.googleapis.com/drive/v3/files".toHttpUrl().newBuilder()
+            .addQueryParameter("spaces", "appDataFolder")
+            .addQueryParameter("q", "name = '$BACKUP_FILE_NAME' and trashed = false")
+            .addQueryParameter("fields", "files(id,name,modifiedTime,size)")
+            .addQueryParameter("pageSize", "1")
+            .build()
 
         val request = Request.Builder()
-            .url(url)
+            .url(httpUrl)
             .header("Authorization", "Bearer $token")
             .header("Accept", "application/json")
             .get()
