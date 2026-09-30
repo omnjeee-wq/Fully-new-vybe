@@ -467,7 +467,7 @@ fun SettingsScreen(
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = viewModel.downloadLocation,
+                                    text = "User data is stored on the user's device."
                                     color = VybeTextMuted,
                                     fontSize = 11.sp,
                                     maxLines = 1,
