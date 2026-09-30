@@ -11,6 +11,7 @@ import com.example.player.PlayerManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class VybeApp : Application() {
 
@@ -42,6 +43,9 @@ class VybeApp : Application() {
             database = database,
             coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
         )
+        CoroutineScope(Dispatchers.IO).launch {
+            com.example.player.EqualizerManager.restoreFromDatabase(database.songDao())
+        }
     }
 
     companion object {

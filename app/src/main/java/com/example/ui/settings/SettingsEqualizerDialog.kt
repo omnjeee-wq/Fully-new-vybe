@@ -25,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -75,14 +76,16 @@ fun SettingsEqualizerDialog(
     onReset: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(24.dp))
-                .border(1.dp, VybeBorder, RoundedCornerShape(24.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
                 .testTag("dialog_equalizer"),
-            color = VybeSurface
+            color = MaterialTheme.colorScheme.surface
         ) {
             Column(
                 modifier = Modifier
@@ -99,14 +102,14 @@ fun SettingsEqualizerDialog(
                     Column {
                         Text(
                             text = "Equalizer",
-                            color = VybeTextPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = OutfitFontFamily
                         )
                         Text(
                             text = "Customize audio frequency spectrum",
-                            color = VybeTextMuted,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp
                         )
                     }
@@ -115,7 +118,7 @@ fun SettingsEqualizerDialog(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = VybeTextSecondary
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -127,14 +130,14 @@ fun SettingsEqualizerDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(VybeSurfaceVariant.copy(alpha = 0.5f))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
                         text = if (enabled) "Equalizer Enabled" else "Equalizer Disabled",
-                        color = if (enabled) VybeOrange else VybeTextSecondary,
+                        color = if (enabled) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -144,9 +147,9 @@ fun SettingsEqualizerDialog(
                         onCheckedChange = onEnabledChange,
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
-                            checkedTrackColor = VybeOrange,
-                            uncheckedThumbColor = VybeTextMuted,
-                            uncheckedTrackColor = VybeSurfaceVariant
+                            checkedTrackColor = primaryColor,
+                            uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     )
                 }
@@ -156,7 +159,7 @@ fun SettingsEqualizerDialog(
                 // Presets Label
                 Text(
                     text = "PRESETS",
-                    color = VybeTextMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
@@ -177,14 +180,14 @@ fun SettingsEqualizerDialog(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(20.dp))
                                 .background(
-                                    if (isSelected && enabled) VybeOrange else VybeSurfaceVariant
+                                    if (isSelected && enabled) primaryColor else MaterialTheme.colorScheme.surfaceVariant
                                 )
                                 .clickable(enabled = enabled) { onPresetSelected(preset) }
                                 .padding(horizontal = 14.dp, vertical = 6.dp)
                         ) {
                             Text(
                                 text = preset,
-                                color = if (isSelected && enabled) Color.White else VybeTextSecondary,
+                                color = if (isSelected && enabled) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             )
@@ -197,7 +200,7 @@ fun SettingsEqualizerDialog(
                 // Frequency Sliders
                 Text(
                     text = "FREQUENCY BANDS",
-                    color = VybeTextMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
@@ -219,12 +222,12 @@ fun SettingsEqualizerDialog(
                         ) {
                             Text(
                                 text = "$freq ($label)",
-                                color = VybeTextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 13.sp
                             )
                             Text(
                                 text = if (gain > 0) "+$gain dB" else "$gain dB",
-                                color = if (gain != 0 && enabled) VybeOrange else VybeTextMuted,
+                                color = if (gain != 0 && enabled) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -237,9 +240,9 @@ fun SettingsEqualizerDialog(
                             steps = 19,
                             enabled = enabled,
                             colors = SliderDefaults.colors(
-                                thumbColor = if (enabled) VybeOrange else VybeTextMuted,
-                                activeTrackColor = if (enabled) VybeOrange else VybeSurfaceVariant,
-                                inactiveTrackColor = VybeSurfaceVariant
+                                thumbColor = if (enabled) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                                activeTrackColor = if (enabled) primaryColor else MaterialTheme.colorScheme.surfaceVariant,
+                                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                             )
                         )
                     }
@@ -257,7 +260,7 @@ fun SettingsEqualizerDialog(
                         onClick = onReset,
                         enabled = enabled,
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = VybeTextSecondary
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     ) {
                         Icon(
@@ -272,7 +275,7 @@ fun SettingsEqualizerDialog(
                     Button(
                         onClick = onDismiss,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = VybeOrange
+                            containerColor = primaryColor
                         )
                     ) {
                         Text(text = "Done", color = Color.White, fontSize = 13.sp)

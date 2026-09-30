@@ -22,6 +22,13 @@ class NetworkMonitor(private val context: Context) {
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
+    fun isWifiConnected(): Boolean {
+        val cm = connectivityManager ?: return false
+        val activeNetwork = cm.activeNetwork ?: return false
+        val capabilities = cm.getNetworkCapabilities(activeNetwork) ?: return false
+        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+    }
+
     val isOnline: Flow<Boolean> = callbackFlow {
         val cm = connectivityManager
         if (cm == null) {

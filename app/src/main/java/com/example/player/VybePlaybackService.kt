@@ -86,6 +86,18 @@ class VybePlaybackService : MediaSessionService() {
             .build()
 
         exoPlayer = player
+        EqualizerManager.attachToSession(player.audioSessionId)
+        player.addListener(object : Player.Listener {
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                EqualizerManager.attachToSession(audioSessionId)
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) {
+                    EqualizerManager.attachToSession(player.audioSessionId)
+                }
+            }
+        })
 
         val openAppIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -145,6 +157,7 @@ class VybePlaybackService : MediaSessionService() {
             mediaSession = null
         }
         exoPlayer = null
+        EqualizerManager.release()
         super.onDestroy()
     }
 }

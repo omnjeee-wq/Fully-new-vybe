@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -49,6 +50,8 @@ fun SettingsSectionHeader(
     icon: ImageVector,
     modifier: Modifier = Modifier
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -59,13 +62,13 @@ fun SettingsSectionHeader(
             modifier = Modifier
                 .size(36.dp)
                 .clip(CircleShape)
-                .background(VybeOrange.copy(alpha = 0.15f)),
+                .background(primaryColor.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = VybeOrange,
+                tint = primaryColor,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -75,7 +78,7 @@ fun SettingsSectionHeader(
         Column {
             Text(
                 text = title,
-                color = VybeTextPrimary,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = OutfitFontFamily,
@@ -83,7 +86,7 @@ fun SettingsSectionHeader(
             )
             Text(
                 text = subtitle,
-                color = VybeTextMuted,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp,
                 fontFamily = OutfitFontFamily
             )
@@ -100,8 +103,8 @@ fun SettingsCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(VybeSurfaceVariant.copy(alpha = 0.6f))
-            .border(1.dp, VybeBorder.copy(alpha = 0.5f), RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(18.dp))
             .padding(16.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -141,7 +144,7 @@ fun SettingsRow(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = VybeTextSecondary,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(14.dp))
@@ -150,7 +153,7 @@ fun SettingsRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    color = VybeTextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -158,7 +161,7 @@ fun SettingsRow(
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = description,
-                        color = VybeTextMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
                     )
                 }
@@ -171,7 +174,7 @@ fun SettingsRow(
             if (!value.isNullOrBlank()) {
                 Text(
                     text = value,
-                    color = VybeOrange,
+                    color = MaterialTheme.colorScheme.primary,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -181,7 +184,7 @@ fun SettingsRow(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
                     contentDescription = null,
-                    tint = VybeTextMuted,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(12.dp)
                 )
             }
@@ -218,7 +221,7 @@ fun SettingsSwitchRow(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = VybeTextSecondary,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(14.dp))
@@ -227,7 +230,7 @@ fun SettingsSwitchRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    color = VybeTextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -235,7 +238,7 @@ fun SettingsSwitchRow(
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = description,
-                        color = VybeTextMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
                     )
                 }
@@ -249,9 +252,9 @@ fun SettingsSwitchRow(
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
-                checkedTrackColor = VybeOrange,
-                uncheckedThumbColor = VybeTextMuted,
-                uncheckedTrackColor = VybeSurfaceVariant
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         )
     }
@@ -262,6 +265,6 @@ fun SettingsDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(vertical = 4.dp),
         thickness = 0.5.dp,
-        color = VybeBorder.copy(alpha = 0.4f)
+        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
     )
 }

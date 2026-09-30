@@ -66,6 +66,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -96,9 +97,11 @@ import com.example.data.drive.SyncStatus
 import com.example.ui.theme.OutfitFontFamily
 import com.example.ui.theme.VybeBlack
 import com.example.ui.theme.VybeBorder
+import com.example.ui.theme.VybeCoral
 import com.example.ui.theme.VybeElectricCyan
 import com.example.ui.theme.VybeOrange
 import com.example.ui.theme.VybePink
+import com.example.ui.theme.VybePurple
 import com.example.ui.theme.VybeSurface
 import com.example.ui.theme.VybeSurfaceVariant
 import com.example.ui.theme.VybeTextMuted
@@ -121,6 +124,7 @@ fun SettingsScreen(
 
     // 2. Appearance State
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val accentColorHex by viewModel.accentColor.collectAsStateWithLifecycle()
     val dynamicTheme by viewModel.dynamicTheme.collectAsStateWithLifecycle()
     val useArtworkColors by viewModel.useArtworkColors.collectAsStateWithLifecycle()
 
@@ -139,6 +143,8 @@ fun SettingsScreen(
     val continuePlaybackOnOpen by viewModel.continuePlaybackOnOpen.collectAsStateWithLifecycle()
 
     // 5. Library & Storage State
+    val downloadQuality by viewModel.downloadQuality.collectAsStateWithLifecycle()
+    val downloadWifiOnly by viewModel.downloadWifiOnly.collectAsStateWithLifecycle()
     val cacheSizeBytes by viewModel.cacheSizeBytes.collectAsStateWithLifecycle()
     val downloadSizeBytes by viewModel.downloadSizeBytes.collectAsStateWithLifecycle()
     val searchHistoryCount by viewModel.searchHistoryCount.collectAsStateWithLifecycle()
@@ -150,7 +156,9 @@ fun SettingsScreen(
 
     // Dialog state holders
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showAccentColorDialog by remember { mutableStateOf(false) }
     var showQualityDialog by remember { mutableStateOf(false) }
+    var showDownloadQualityDialog by remember { mutableStateOf(false) }
     var showEqualizerDialog by remember { mutableStateOf(false) }
     var showCrossfadeDialog by remember { mutableStateOf(false) }
     var showRepeatDialog by remember { mutableStateOf(false) }
@@ -173,7 +181,7 @@ fun SettingsScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(VybeBlack)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .testTag("settings_screen")
     ) {
@@ -236,6 +244,17 @@ fun SettingsScreen(
                             icon = Icons.Outlined.Palette,
                             onClick = { showThemeDialog = true },
                             testTag = "item_theme"
+                        )
+
+                        SettingsDivider()
+
+                        SettingsRow(
+                            title = "Accent Color",
+                            description = "Primary highlight color across the app",
+                            value = getAccentColorName(accentColorHex),
+                            icon = Icons.Outlined.ColorLens,
+                            onClick = { showAccentColorDialog = true },
+                            testTag = "item_accent_color"
                         )
 
                         SettingsDivider()
@@ -426,6 +445,28 @@ fun SettingsScreen(
                                 )
                             }
                         }
+
+                        SettingsDivider()
+
+                        SettingsRow(
+                            title = "Download Quality",
+                            description = "Audio bitrate for offline music files",
+                            value = downloadQuality,
+                            icon = Icons.Outlined.GraphicEq,
+                            onClick = { showDownloadQualityDialog = true },
+                            testTag = "item_download_quality"
+                        )
+
+                        SettingsDivider()
+
+                        SettingsSwitchRow(
+                            title = "Download over Wi-Fi only",
+                            description = "Prevent downloads on mobile data to save cellular bandwidth",
+                            checked = downloadWifiOnly,
+                            onCheckedChange = { viewModel.setDownloadWifiOnly(it) },
+                            icon = Icons.Outlined.SyncAlt,
+                            testTag = "item_download_wifi_only"
+                        )
 
                         SettingsDivider()
 
@@ -683,14 +724,87 @@ fun SettingsScreen(
         )
     }
 
+    // Accent Color Selection Dialog
+    if (showAccentColorDialog) {
+        val accentOptions = listOf(
+            Triple("Vybe Orange", "#FF6436", VybeOrange),
+            Triple("Sunset Coral", "#FF5252", VybeCoral),
+            Triple("Neon Pink", "#F43F5E", VybePink),
+            Triple("Electric Cyan", "#06B6D4", VybeElectricCyan),
+            Triple("Deep Violet", "#8B5CF6", VybePurple),
+            Triple("Emerald Green", "#10B981", Color(0xFF10B981)),
+            Triple("Amber Gold", "#F59E0B", Color(0xFFF59E0B)),
+            Triple("Ocean Blue", "#3B82F6", Color(0xFF3B82F6))
+        )
+        AlertDialog(
+            onDismissRequest = { showAccentColorDialog = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = {
+                Text(
+                    text = "Choose Accent Color",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = OutfitFontFamily
+                )
+            },
+            text = {
+                Column {
+                    accentOptions.forEach { (name, hex, color) ->
+                        val isSelected = accentColorHex.equals(hex, ignoreCase = true)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    viewModel.setAccentColor(hex)
+                                    showAccentColorDialog = false
+                                }
+                                .padding(vertical = 10.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .border(2.dp, if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent, CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Text(
+                                text = name,
+                                color = if (isSelected) color else MaterialTheme.colorScheme.onSurface,
+                                fontSize = 14.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                            if (isSelected) {
+                                Spacer(modifier = Modifier.weight(1f))
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = color,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAccentColorDialog = false }) {
+                    Text(text = "Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        )
+    }
+
     // Audio Quality Dialog
     if (showQualityDialog) {
         val qualityOptions = listOf(
             "Auto",
             "Low (96 kbps)",
             "Medium (160 kbps)",
-            "High (320 kbps)",
-            "Very High"
+            "High (320 kbps)"
         )
         SelectionDialog(
             title = "Select Streaming Quality",
@@ -701,6 +815,25 @@ fun SettingsScreen(
                 showQualityDialog = false
             },
             onDismiss = { showQualityDialog = false }
+        )
+    }
+
+    // Download Quality Dialog
+    if (showDownloadQualityDialog) {
+        val downloadQualityOptions = listOf(
+            "High (320 kbps)",
+            "Medium (160 kbps)",
+            "Low (96 kbps)"
+        )
+        SelectionDialog(
+            title = "Download Audio Quality",
+            options = downloadQualityOptions,
+            selectedOption = downloadQuality,
+            onOptionSelected = {
+                viewModel.setDownloadQuality(it)
+                showDownloadQualityDialog = false
+            },
+            onDismiss = { showDownloadQualityDialog = false }
         )
     }
 
@@ -842,14 +975,14 @@ private fun SettingsTopBar() {
         Column {
             Text(
                 text = "Settings",
-                color = VybeTextPrimary,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = OutfitFontFamily
             )
             Text(
                 text = "Preferences, data sync & accounts",
-                color = VybeTextMuted,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
         }
@@ -857,7 +990,7 @@ private fun SettingsTopBar() {
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(12.dp))
-                .background(VybeSurfaceVariant)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(horizontal = 10.dp, vertical = 6.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -865,12 +998,12 @@ private fun SettingsTopBar() {
                     modifier = Modifier
                         .size(7.dp)
                         .clip(CircleShape)
-                        .background(VybeOrange)
+                        .background(MaterialTheme.colorScheme.primary)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "v1.0",
-                    color = VybeTextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -1271,7 +1404,7 @@ private fun ActionRow(
     title: String,
     description: String,
     buttonText: String,
-    buttonColor: Color = VybeOrange,
+    buttonColor: Color = MaterialTheme.colorScheme.primary,
     onClick: () -> Unit,
     testTag: String = ""
 ) {
@@ -1285,14 +1418,14 @@ private fun ActionRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                color = VybeTextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = description,
-                color = VybeTextMuted,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
         }
@@ -1317,13 +1450,15 @@ private fun SelectionDialog(
     onOptionSelected: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = VybeSurface,
+        containerColor = MaterialTheme.colorScheme.surface,
         title = {
             Text(
                 text = title,
-                color = VybeTextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = OutfitFontFamily
@@ -1345,14 +1480,14 @@ private fun SelectionDialog(
                             selected = isSelected,
                             onClick = { onOptionSelected(option) },
                             colors = RadioButtonDefaults.colors(
-                                selectedColor = VybeOrange,
-                                unselectedColor = VybeTextMuted
+                                selectedColor = primaryColor,
+                                unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = option,
-                            color = if (isSelected) VybeOrange else VybeTextPrimary,
+                            color = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurface,
                             fontSize = 14.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                         )
@@ -1362,7 +1497,7 @@ private fun SelectionDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(text = "Cancel", color = VybeTextSecondary)
+                Text(text = "Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )
@@ -1377,13 +1512,15 @@ private fun ConfirmationDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = VybeSurface,
+        containerColor = MaterialTheme.colorScheme.surface,
         title = {
             Text(
                 text = title,
-                color = VybeTextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = OutfitFontFamily
@@ -1392,7 +1529,7 @@ private fun ConfirmationDialog(
         text = {
             Text(
                 text = message,
-                color = VybeTextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp,
                 lineHeight = 18.sp
             )
@@ -1401,7 +1538,7 @@ private fun ConfirmationDialog(
             Button(
                 onClick = onConfirm,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isDestructive) Color(0xFFEF4444) else VybeOrange
+                    containerColor = if (isDestructive) Color(0xFFEF4444) else primaryColor
                 )
             ) {
                 Text(text = confirmText, color = Color.White, fontWeight = FontWeight.Bold)
@@ -1409,7 +1546,7 @@ private fun ConfirmationDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(text = "Cancel", color = VybeTextSecondary)
+                Text(text = "Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )
@@ -1421,13 +1558,15 @@ private fun InfoDialog(
     content: String,
     onDismiss: () -> Unit
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = VybeSurface,
+        containerColor = MaterialTheme.colorScheme.surface,
         title = {
             Text(
                 text = title,
-                color = VybeTextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = OutfitFontFamily
@@ -1436,7 +1575,7 @@ private fun InfoDialog(
         text = {
             Text(
                 text = content,
-                color = VybeTextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp,
                 lineHeight = 19.sp,
                 modifier = Modifier.verticalScroll(rememberScrollState())
@@ -1444,10 +1583,24 @@ private fun InfoDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(text = "Close", color = VybeOrange, fontWeight = FontWeight.Bold)
+                Text(text = "Close", color = primaryColor, fontWeight = FontWeight.Bold)
             }
         }
     )
+}
+
+private fun getAccentColorName(hex: String): String {
+    return when (hex.uppercase()) {
+        "#FF6436" -> "Vybe Orange"
+        "#FF5252" -> "Sunset Coral"
+        "#F43F5E" -> "Neon Pink"
+        "#06B6D4" -> "Electric Cyan"
+        "#8B5CF6" -> "Deep Violet"
+        "#10B981" -> "Emerald Green"
+        "#F59E0B" -> "Amber Gold"
+        "#3B82F6" -> "Ocean Blue"
+        else -> "Custom ($hex)"
+    }
 }
 
 private fun formatStorage(bytes: Long): String {

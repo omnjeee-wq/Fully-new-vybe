@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class PlayerManager private constructor(
     private val context: Context,
@@ -155,15 +156,37 @@ class PlayerManager private constructor(
                 startProgressTracker()
             }
         } else if (_playerState.value.queue.isNotEmpty() && ctrl.mediaItemCount == 0) {
-            // Restore media items to player without auto-playing or eager decoding
-            val restoredQueue = _playerState.value.queue
-            val restoredIdx = _playerState.value.currentIndex.coerceIn(0, restoredQueue.size - 1)
-            val restoredPos = _playerState.value.currentPositionMs
-            val mediaItems = restoredQueue.map { it.toMediaItem() }
-            ctrl.setMediaItems(mediaItems, restoredIdx, restoredPos)
-            ctrl.shuffleModeEnabled = _playerState.value.isShuffleEnabled
-            ctrl.repeatMode = _playerState.value.repeatMode
-            // Note: ctrl.prepare() will be called lazily when playback actually starts
+            scope.launch(Dispatchers.IO) {
+                val songDao = VybeApp.instance.database.songDao()
+                val continuePlayback = songDao.getPreference("pref_continue_playback_open")?.toBooleanStrictOrNull() ?: true
+                if (continuePlayback) {
+                    val restoredQueue = _playerState.value.queue
+                    val restoredIdx = _playerState.value.currentIndex.coerceIn(0, restoredQueue.size - 1)
+                    val restoredPos = _playerState.value.currentPositionMs
+                    val quality = songDao.getPreference("pref_streaming_quality") ?: "High (320 kbps)"
+                    val mediaItems = restoredQueue.map { it.toMediaItem(quality) }
+
+                    val savedRepeat = songDao.getPreference("pref_repeat_mode") ?: "Off"
+                    val mappedRepeat = when (savedRepeat) {
+                        "All" -> Player.REPEAT_MODE_ALL
+                        "One" -> Player.REPEAT_MODE_ONE
+                        else -> Player.REPEAT_MODE_OFF
+                    }
+                    val startOnLaunch = songDao.getPreference("pref_start_playback_launch")?.toBooleanStrictOrNull() ?: false
+
+                    withContext(Dispatchers.Main) {
+                        ctrl.setMediaItems(mediaItems, restoredIdx, restoredPos)
+                        ctrl.shuffleModeEnabled = _playerState.value.isShuffleEnabled
+                        ctrl.repeatMode = mappedRepeat
+                        _playerState.update { it.copy(repeatMode = mappedRepeat) }
+
+                        if (startOnLaunch) {
+                            ctrl.prepare()
+                            ctrl.play()
+                        }
+                    }
+                }
+            }
         }
 
         // Execute queued commands
@@ -333,12 +356,17 @@ class PlayerManager private constructor(
             )
         }
 
-        val mediaItems = fullList.map { it.toMediaItem() }
+        scope.launch(Dispatchers.IO) {
+            val quality = VybeApp.instance.database.songDao().getPreference("pref_streaming_quality") ?: "High (320 kbps)"
+            val mediaItems = fullList.map { it.toMediaItem(quality) }
 
-        executeWithController { ctrl ->
-            ctrl.setMediaItems(mediaItems, startIndex, 0L)
-            ctrl.prepare()
-            ctrl.play()
+            withContext(Dispatchers.Main) {
+                executeWithController { ctrl ->
+                    ctrl.setMediaItems(mediaItems, startIndex, 0L)
+                    ctrl.prepare()
+                    ctrl.play()
+                }
+            }
         }
 
         persistCurrentState()
@@ -608,7 +636,25 @@ class PlayerManager private constructor(
         scope.launch(Dispatchers.IO) {
             repository.recordListeningEvent(currentSong, ListeningEventType.PLAY_COMPLETED)
         }
-        next()
+        executeWithController { ctrl ->
+            if (ctrl.hasNextMediaItem()) {
+                ctrl.seekToNextMediaItem()
+            } else if (_playerState.value.repeatMode == Player.REPEAT_MODE_ALL && _playerState.value.queue.isNotEmpty()) {
+                ctrl.seekTo(0, 0L)
+            } else {
+                scope.launch(Dispatchers.IO) {
+                    val autoplay = VybeApp.instance.database.songDao().getPreference("pref_autoplay")?.toBooleanStrictOrNull() ?: true
+                    if (autoplay) {
+                        val candidates = repository.getRadioQueue(currentSong.id, 10).getOrNull()
+                        if (!candidates.isNullOrEmpty()) {
+                            withContext(Dispatchers.Main) {
+                                playSong(candidates.first(), candidates, "Recommended For You")
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
    private fun onQualifyingPlayCounted(song: Song) {
@@ -655,7 +701,7 @@ class PlayerManager private constructor(
     }
 }
 
-fun Song.toMediaItem(): MediaItem {
+fun Song.toMediaItem(preferredQuality: String? = null): MediaItem {
     val metadata = MediaMetadata.Builder()
         .setTitle(title)
         .setArtist(artist)
@@ -689,7 +735,12 @@ fun Song.toMediaItem(): MediaItem {
         if (localFile.exists() && localFile.length() > 0) {
             Uri.fromFile(localFile)
         } else {
-            Uri.parse(streamUrl)
+            val resolvedUrl = if (preferredQuality != null) {
+                com.example.util.MusicUtils.applyQualityToUrl(streamUrl, preferredQuality)
+            } else {
+                streamUrl
+            }
+            Uri.parse(resolvedUrl)
         }
     }
 

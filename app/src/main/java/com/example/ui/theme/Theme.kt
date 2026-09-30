@@ -4,18 +4,22 @@ import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val VybeDarkColorScheme = darkColorScheme(
-    primary = VybeOrange,
+val LocalVybeAccentColor = staticCompositionLocalOf { VybeOrange }
+
+fun vybeDarkColorScheme(accentColor: Color = VybeOrange) = darkColorScheme(
+    primary = accentColor,
     onPrimary = Color.White,
     primaryContainer = VybeSurfaceVariant,
-    onPrimaryContainer = VybeOrange,
+    onPrimaryContainer = accentColor,
     secondary = VybeCoral,
     onSecondary = Color.White,
     tertiary = VybeElectricCyan,
@@ -29,64 +33,45 @@ private val VybeDarkColorScheme = darkColorScheme(
     outline = VybeBorder
 )
 
-private val VybeLightColorScheme = lightColorScheme(
-    primary = VybeOrange,
+fun vybeLightColorScheme(accentColor: Color = VybeOrange) = lightColorScheme(
+    primary = accentColor,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFE5DD),
-    onPrimaryContainer = Color(0xFF8A2100),
+    primaryContainer = Color(0xFFF1F5F9),
+    onPrimaryContainer = accentColor,
     secondary = VybeCoral,
     onSecondary = Color.White,
     tertiary = VybeElectricCyan,
-    onTertiary = Color.Black,
-    background = Color(0xFFF7F7F7),
-    onBackground = Color(0xFF111111),
+    onTertiary = Color.White,
+    background = Color(0xFFF8FAFC),
+    onBackground = Color(0xFF0F172A),
     surface = Color.White,
-    onSurface = Color(0xFF111111),
-    surfaceVariant = Color(0xFFE9E9E9),
-    onSurfaceVariant = Color(0xFF555555),
-    outline = Color(0xFF888888)
+    onSurface = Color(0xFF0F172A),
+    surfaceVariant = Color(0xFFF1F5F9),
+    onSurfaceVariant = Color(0xFF64748B),
+    outline = Color(0xFFCBD5E1)
 )
 
 @Composable
 fun VybeTheme(
-    themeMode: String = "Dark",
-    dynamicTheme: Boolean = false,
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    accentColor: Color = VybeOrange,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
-
-    val isDark = when (themeMode) {
-        "Light" -> false
-        "System" -> isSystemInDarkTheme()
-        else -> true
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+        darkTheme -> vybeDarkColorScheme(accentColor)
+        else -> vybeLightColorScheme(accentColor)
     }
 
-    val colorScheme = if (
-        dynamicTheme &&
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    ) {
-        if (isDark) {
-            dynamicDarkColorScheme(context)
-        } else {
-            dynamicLightColorScheme(context)
-        }
-    } else {
-        when (themeMode) {
-            "Light" -> VybeLightColorScheme
-            "System" -> {
-                if (isSystemInDarkTheme()) {
-                    VybeDarkColorScheme
-                } else {
-                    VybeLightColorScheme
-                }
-            }
-            else -> VybeDarkColorScheme
-        }
+    CompositionLocalProvider(LocalVybeAccentColor provides accentColor) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
     }
-
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
 }

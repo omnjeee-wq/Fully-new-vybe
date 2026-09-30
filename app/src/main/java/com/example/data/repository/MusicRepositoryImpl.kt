@@ -30,16 +30,36 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.example.VybeApp
+import com.example.data.remote.RetrofitClient
 import java.io.File
 import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
+import android.widget.Toast
+import androidx.core.app.NotificationCompat
+import com.example.R
 
 class MusicRepositoryImpl(
     private val apiService: JioSaavnApiService,
     private val songDao: SongDao,
     private val context: Context = VybeApp.instance
 ) : MusicRepository {
+
+    init {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val customUrl = songDao.getPreference("pref_backend_url")
+                if (!customUrl.isNullOrBlank()) {
+                    RetrofitClient.setBaseUrl(customUrl)
+                }
+            } catch (_: Exception) {}
+        }
+    }
 
     // In-memory cache for Home sections
     private var cachedSections: List<HomeSection>? = null
@@ -128,11 +148,12 @@ class MusicRepositoryImpl(
 
     override suspend fun getRecommendationCandidates(): List<Song> = withContext(Dispatchers.IO) {
         try {
+            val quality = songDao.getPreference("pref_streaming_quality") ?: "High (320 kbps)"
             coroutineScope {
                 val trendingDeferred = async {
                     try {
                         val resp = apiService.searchSongs(query = "Trending Hindi", limit = 20)
-                        resp.data?.results?.map { MusicUtils.toDomainSong(it) } ?: emptyList()
+                        resp.data?.results?.map { MusicUtils.toDomainSong(it, preferredQuality = quality) } ?: emptyList()
                     } catch (_: Exception) {
                         emptyList()
                     }
@@ -140,7 +161,7 @@ class MusicRepositoryImpl(
                 val topDeferred = async {
                     try {
                         val resp = apiService.searchSongs(query = "Top Bollywood", limit = 20)
-                        resp.data?.results?.map { MusicUtils.toDomainSong(it) } ?: emptyList()
+                        resp.data?.results?.map { MusicUtils.toDomainSong(it, preferredQuality = quality) } ?: emptyList()
                     } catch (_: Exception) {
                         emptyList()
                     }
@@ -211,7 +232,8 @@ class MusicRepositoryImpl(
             val response = apiService.getAlbumById(albumId)
             val apiAlbum = response.data
             if (apiAlbum != null) {
-                Result.success(MusicUtils.toDomainAlbum(apiAlbum))
+                val quality = songDao.getPreference("pref_streaming_quality") ?: "High (320 kbps)"
+                Result.success(MusicUtils.toDomainAlbum(apiAlbum, preferredQuality = quality))
             } else {
                 Result.failure(NoSuchElementException("Album not found"))
             }
@@ -225,7 +247,8 @@ class MusicRepositoryImpl(
             val response = apiService.getPlaylistById(playlistId, limit = 50)
             val apiPlaylist = response.data
             if (apiPlaylist != null) {
-                Result.success(MusicUtils.toDomainPlaylist(apiPlaylist))
+                val quality = songDao.getPreference("pref_streaming_quality") ?: "High (320 kbps)"
+                Result.success(MusicUtils.toDomainPlaylist(apiPlaylist, preferredQuality = quality))
             } else {
                 Result.failure(NoSuchElementException("Playlist not found"))
             }
@@ -237,7 +260,8 @@ class MusicRepositoryImpl(
     override suspend fun searchSongs(query: String, limit: Int): Result<List<Song>> = withContext(Dispatchers.IO) {
         try {
             val response = apiService.searchSongs(query = query, limit = limit)
-            val songs = response.data?.results?.map { MusicUtils.toDomainSong(it) } ?: emptyList()
+            val quality = songDao.getPreference("pref_streaming_quality") ?: "High (320 kbps)"
+            val songs = response.data?.results?.map { MusicUtils.toDomainSong(it, preferredQuality = quality) } ?: emptyList()
             Result.success(songs)
         } catch (e: Exception) {
             Result.failure(e)
@@ -252,15 +276,16 @@ class MusicRepositoryImpl(
             val seeds = (listOf(songId) + recentIds).distinct().take(3).joinToString(",")
             val exclude = recentIds.reversed().joinToString(",")
 
+            val quality = songDao.getPreference("pref_streaming_quality") ?: "High (320 kbps)"
             val response = apiService.getQueue(url = queueUrl, seeds = seeds, exclude = exclude, limit = limit)
-            val songs = response.data?.map { MusicUtils.toDomainSong(it) } ?: emptyList()
+            val songs = response.data?.map { MusicUtils.toDomainSong(it, preferredQuality = quality) } ?: emptyList()
 
             if (songs.isNotEmpty()) {
                 Result.success(songs)
             } else {
                 // backup: purana suggestions endpoint
                 val old = apiService.getSongSuggestions(id = songId, limit = limit)
-                Result.success(old.data?.map { MusicUtils.toDomainSong(it) } ?: emptyList())
+                Result.success(old.data?.map { MusicUtils.toDomainSong(it, preferredQuality = quality) } ?: emptyList())
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -317,7 +342,8 @@ class MusicRepositoryImpl(
             val apiSong = response.data?.firstOrNull()
             if (apiSong != null) {
                 val isFav = songDao.isFavorite(songId)
-                Result.success(MusicUtils.toDomainSong(apiSong, isLiked = isFav))
+                val quality = songDao.getPreference("pref_streaming_quality") ?: "High (320 kbps)"
+                Result.success(MusicUtils.toDomainSong(apiSong, isLiked = isFav, preferredQuality = quality))
             } else {
                 Result.failure(NoSuchElementException("Song not found"))
             }
@@ -595,13 +621,34 @@ class MusicRepositoryImpl(
             songDao.removeDownloadedSong(song.id)
         }
 
-        // 1. Resolve audio stream URL
-        var audioUrl = song.streamUrl
-        if (audioUrl.isBlank() || audioUrl.startsWith("file://") || audioUrl.startsWith("/")) {
-            val freshSong = getSongById(song.id).getOrNull()
-            if (freshSong != null && freshSong.streamUrl.isNotBlank()) {
-                audioUrl = freshSong.streamUrl
+        // Check Wi-Fi only restriction
+        val wifiOnly = songDao.getPreference("pref_download_wifi_only")?.toBooleanStrictOrNull() ?: false
+        if (wifiOnly) {
+            val networkMonitor = com.example.util.NetworkMonitor(context)
+            if (!networkMonitor.isWifiConnected()) {
+                Log.w("MusicRepository", "Download blocked: Wi-Fi only download is enabled and device is not on Wi-Fi")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Download paused: Connect to Wi-Fi to download", Toast.LENGTH_SHORT).show()
+                }
+                return@withContext false
             }
+        }
+
+        // 1. Resolve audio stream URL with preferred download quality
+        val downloadQuality = songDao.getPreference("pref_download_quality") ?: "High (320 kbps)"
+        var audioUrl = ""
+        val response = try {
+            apiService.getSongById(song.id)
+        } catch (_: Exception) {
+            null
+        }
+        val apiSong = response?.data?.firstOrNull()
+        if (apiSong != null) {
+            audioUrl = MusicUtils.selectBestAudioUrl(apiSong.downloadUrl, downloadQuality)
+        }
+
+        if (audioUrl.isBlank() || audioUrl.startsWith("file://") || audioUrl.startsWith("/")) {
+            audioUrl = MusicUtils.applyQualityToUrl(song.streamUrl, downloadQuality)
         }
 
         if (audioUrl.isBlank() || audioUrl.startsWith("file://") || audioUrl.startsWith("/")) {
@@ -678,6 +725,33 @@ class MusicRepositoryImpl(
                         downloadTimestamp = System.currentTimeMillis()
                     )
                 )
+
+                val notifyEnabled = songDao.getPreference("pref_download_notifications")?.toBooleanStrictOrNull() ?: true
+                if (notifyEnabled) {
+                    try {
+                        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                        if (nm != null) {
+                            val channelId = "vybe_download_channel"
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                val channel = NotificationChannel(
+                                    channelId,
+                                    "Downloads",
+                                    NotificationManager.IMPORTANCE_LOW
+                                )
+                                nm.createNotificationChannel(channel)
+                            }
+                            val notif = NotificationCompat.Builder(context, channelId)
+                                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                                .setContentTitle("Download Complete")
+                                .setContentText("${song.title} is ready for offline playback")
+                                .setPriority(NotificationCompat.PRIORITY_LOW)
+                                .setAutoCancel(true)
+                                .build()
+                            nm.notify(song.id.hashCode(), notif)
+                        }
+                    } catch (_: Exception) {}
+                }
+
                 return@withContext true
             } else {
                 tempFile.delete()

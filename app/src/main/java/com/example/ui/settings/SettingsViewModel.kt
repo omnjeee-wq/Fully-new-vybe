@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import coil.Coil
 import com.example.VybeApp
 import com.example.data.drive.DriveAccountInfo
 import com.example.data.drive.DriveBackupSummary
@@ -11,7 +12,9 @@ import com.example.data.drive.GoogleDriveManager
 import com.example.data.drive.SyncStatus
 import com.example.data.local.AppPreferenceEntity
 import com.example.data.local.SongDao
+import com.example.data.remote.RetrofitClient
 import com.example.domain.repository.MusicRepository
+import com.example.player.EqualizerManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,6 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.io.File
 
 class SettingsViewModel(
@@ -45,6 +49,9 @@ class SettingsViewModel(
     // -------------------------------------------------------------
     private val _themeMode = MutableStateFlow("Dark")
     val themeMode: StateFlow<String> = _themeMode.asStateFlow()
+
+    private val _accentColor = MutableStateFlow("#FF6436")
+    val accentColor: StateFlow<String> = _accentColor.asStateFlow()
 
     private val _dynamicTheme = MutableStateFlow(false)
     val dynamicTheme: StateFlow<Boolean> = _dynamicTheme.asStateFlow()
@@ -91,6 +98,12 @@ class SettingsViewModel(
     // -------------------------------------------------------------
     // 5. LIBRARY & STORAGE
     // -------------------------------------------------------------
+    private val _downloadQuality = MutableStateFlow("High (320 kbps)")
+    val downloadQuality: StateFlow<String> = _downloadQuality.asStateFlow()
+
+    private val _downloadWifiOnly = MutableStateFlow(false)
+    val downloadWifiOnly: StateFlow<Boolean> = _downloadWifiOnly.asStateFlow()
+
     val downloadLocation: String = File(appContext.filesDir, "downloads").absolutePath
 
     private val _cacheSizeBytes = MutableStateFlow(0L)
@@ -113,6 +126,12 @@ class SettingsViewModel(
 
     private val _downloadNotifications = MutableStateFlow(true)
     val downloadNotifications: StateFlow<Boolean> = _downloadNotifications.asStateFlow()
+
+    // -------------------------------------------------------------
+    // 7. BACKEND SERVER
+    // -------------------------------------------------------------
+    private val _backendUrl = MutableStateFlow(RetrofitClient.DEFAULT_BASE_URL)
+    val backendUrl: StateFlow<String> = _backendUrl.asStateFlow()
 
     companion object {
         val EQUALIZER_PRESETS = mapOf(
@@ -143,13 +162,17 @@ class SettingsViewModel(
 
                 // 2. Appearance
                 _themeMode.value = songDao.getPreference("pref_theme_mode") ?: "Dark"
+                _accentColor.value = songDao.getPreference("pref_accent_color") ?: "#FF6436"
                 _dynamicTheme.value = songDao.getPreference("pref_dynamic_theme")?.toBooleanStrictOrNull() ?: false
                 _useArtworkColors.value = songDao.getPreference("pref_use_artwork_colors")?.toBooleanStrictOrNull() ?: true
 
                 // 3. Audio
                 val quality = songDao.getPreference("pref_streaming_quality") ?: "High (320 kbps)"
                 _streamingQuality.value = quality
-                _equalizerEnabled.value = songDao.getPreference("pref_equalizer_enabled")?.toBooleanStrictOrNull() ?: false
+                val eqEnabled = songDao.getPreference("pref_equalizer_enabled")?.toBooleanStrictOrNull() ?: false
+                _equalizerEnabled.value = eqEnabled
+                EqualizerManager.setEnabled(eqEnabled)
+
                 _equalizerPreset.value = songDao.getPreference("pref_equalizer_preset") ?: "Normal"
 
                 val b0 = songDao.getPreference("pref_eq_band_0")?.toIntOrNull() ?: 0
@@ -157,7 +180,9 @@ class SettingsViewModel(
                 val b2 = songDao.getPreference("pref_eq_band_2")?.toIntOrNull() ?: 0
                 val b3 = songDao.getPreference("pref_eq_band_3")?.toIntOrNull() ?: 0
                 val b4 = songDao.getPreference("pref_eq_band_4")?.toIntOrNull() ?: 0
-                _equalizerBands.value = listOf(b0, b1, b2, b3, b4)
+                val loadedBands = listOf(b0, b1, b2, b3, b4)
+                _equalizerBands.value = loadedBands
+                EqualizerManager.setAllBands(loadedBands)
 
                 // 4. Playback
                 _autoplay.value = songDao.getPreference("pref_autoplay")?.toBooleanStrictOrNull() ?: true
@@ -167,9 +192,20 @@ class SettingsViewModel(
                 _startPlaybackOnLaunch.value = songDao.getPreference("pref_start_playback_launch")?.toBooleanStrictOrNull() ?: false
                 _continuePlaybackOnOpen.value = songDao.getPreference("pref_continue_playback_open")?.toBooleanStrictOrNull() ?: true
 
-                // 5. Notifications
+                // 5. Library & Storage
+                _downloadQuality.value = songDao.getPreference("pref_download_quality") ?: "High (320 kbps)"
+                _downloadWifiOnly.value = songDao.getPreference("pref_download_wifi_only")?.toBooleanStrictOrNull() ?: false
+
+                // 6. Notifications
                 _playbackNotifications.value = songDao.getPreference("pref_playback_notifications")?.toBooleanStrictOrNull() ?: true
                 _downloadNotifications.value = songDao.getPreference("pref_download_notifications")?.toBooleanStrictOrNull() ?: true
+
+                // 7. Backend URL
+                val savedUrl = songDao.getPreference("pref_backend_url")
+                if (!savedUrl.isNullOrBlank()) {
+                    _backendUrl.value = savedUrl
+                    RetrofitClient.setBaseUrl(savedUrl)
+                }
 
                 // Counts
                 _searchHistoryCount.value = songDao.getAllSearchHistorySync().size
@@ -205,6 +241,11 @@ class SettingsViewModel(
         persistPreference("pref_theme_mode", mode)
     }
 
+    fun setAccentColor(hexColor: String) {
+        _accentColor.value = hexColor
+        persistPreference("pref_accent_color", hexColor)
+    }
+
     fun setDynamicTheme(enabled: Boolean) {
         _dynamicTheme.value = enabled
         persistPreference("pref_dynamic_theme", enabled.toString())
@@ -224,6 +265,7 @@ class SettingsViewModel(
     fun setEqualizerEnabled(enabled: Boolean) {
         _equalizerEnabled.value = enabled
         persistPreference("pref_equalizer_enabled", enabled.toString())
+        EqualizerManager.setEnabled(enabled)
     }
 
     fun setEqualizerPreset(preset: String) {
@@ -231,6 +273,7 @@ class SettingsViewModel(
         persistPreference("pref_equalizer_preset", preset)
         val presetBands = EQUALIZER_PRESETS[preset] ?: listOf(0, 0, 0, 0, 0)
         _equalizerBands.value = presetBands
+        EqualizerManager.setAllBands(presetBands)
         saveEqualizerBands(presetBands)
     }
 
@@ -241,6 +284,7 @@ class SettingsViewModel(
             _equalizerBands.value = current
             _equalizerPreset.value = "Custom"
             persistPreference("pref_equalizer_preset", "Custom")
+            EqualizerManager.setBandGain(bandIndex, value)
             saveEqualizerBands(current)
         }
     }
@@ -250,6 +294,7 @@ class SettingsViewModel(
         _equalizerBands.value = flat
         _equalizerPreset.value = "Flat"
         persistPreference("pref_equalizer_preset", "Flat")
+        EqualizerManager.setAllBands(flat)
         saveEqualizerBands(flat)
     }
 
@@ -295,11 +340,25 @@ class SettingsViewModel(
     }
 
     // --- Library & Storage actions ---
+    fun setDownloadQuality(quality: String) {
+        _downloadQuality.value = quality
+        persistPreference("pref_download_quality", quality)
+    }
+
+    fun setDownloadWifiOnly(enabled: Boolean) {
+        _downloadWifiOnly.value = enabled
+        persistPreference("pref_download_wifi_only", enabled.toString())
+    }
+
     fun clearCache() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 try {
                     appContext.cacheDir.deleteRecursively()
+                    // Clear Coil image cache
+                    val imageLoader = Coil.imageLoader(appContext)
+                    imageLoader.diskCache?.clear()
+                    imageLoader.memoryCache?.clear()
                 } catch (_: Exception) {}
             }
             calculateCacheSize()
@@ -357,5 +416,25 @@ class SettingsViewModel(
     fun setDownloadNotifications(enabled: Boolean) {
         _downloadNotifications.value = enabled
         persistPreference("pref_download_notifications", enabled.toString())
+    }
+
+    // --- Backend Server URL actions ---
+    fun setBackendUrl(url: String): Boolean {
+        val trimmed = url.trim()
+        val parsed = trimmed.toHttpUrlOrNull()
+        if (parsed == null || (!trimmed.startsWith("http://") && !trimmed.startsWith("https://"))) {
+            return false
+        }
+        val formatted = if (trimmed.endsWith("/")) trimmed else "$trimmed/"
+        _backendUrl.value = formatted
+        persistPreference("pref_backend_url", formatted)
+        RetrofitClient.setBaseUrl(formatted)
+        return true
+    }
+
+    fun resetBackendUrl() {
+        _backendUrl.value = RetrofitClient.DEFAULT_BASE_URL
+        persistPreference("pref_backend_url", RetrofitClient.DEFAULT_BASE_URL)
+        RetrofitClient.setBaseUrl(RetrofitClient.DEFAULT_BASE_URL)
     }
 }

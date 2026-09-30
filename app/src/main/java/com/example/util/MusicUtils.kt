@@ -57,17 +57,58 @@ object MusicUtils {
         return best?.url.orEmpty()
     }
 
-    fun selectBestAudioUrl(downloads: List<ApiDownloadItem>?): String {
+    fun selectBestAudioUrl(downloads: List<ApiDownloadItem>?, preferredQuality: String? = null): String {
         if (downloads.isNullOrEmpty()) return ""
-        // Prefer 320kbps -> 160kbps -> 96kbps -> first available
-        val best = downloads.find { it.quality == "320kbps" }
-            ?: downloads.find { it.quality == "160kbps" }
-            ?: downloads.find { it.quality == "96kbps" }
-            ?: downloads.lastOrNull { !it.url.isNullOrBlank() }
-        return best?.url.orEmpty()
+        val pref = preferredQuality?.lowercase(Locale.US) ?: ""
+
+        val selected = when {
+            pref.contains("96") || pref.contains("low") -> {
+                downloads.find { it.quality == "96kbps" }
+                    ?: downloads.find { it.quality == "160kbps" }
+                    ?: downloads.find { it.quality == "320kbps" }
+            }
+            pref.contains("160") || pref.contains("medium") -> {
+                downloads.find { it.quality == "160kbps" }
+                    ?: downloads.find { it.quality == "320kbps" }
+                    ?: downloads.find { it.quality == "96kbps" }
+            }
+            pref.contains("320") || pref.contains("high") -> {
+                downloads.find { it.quality == "320kbps" }
+                    ?: downloads.find { it.quality == "160kbps" }
+                    ?: downloads.find { it.quality == "96kbps" }
+            }
+            else -> {
+                downloads.find { it.quality == "320kbps" }
+                    ?: downloads.find { it.quality == "160kbps" }
+                    ?: downloads.find { it.quality == "96kbps" }
+            }
+        }
+
+        val rawUrl = selected?.url ?: downloads.lastOrNull { !it.url.isNullOrBlank() }?.url.orEmpty()
+        return applyQualityToUrl(rawUrl, preferredQuality)
     }
 
-    fun toDomainSong(apiSong: ApiSong, isLiked: Boolean = false): Song {
+    fun applyQualityToUrl(url: String, preferredQuality: String?): String {
+        if (url.isBlank() || url.startsWith("file://") || url.startsWith("/")) return url
+        val pref = preferredQuality?.lowercase(Locale.US) ?: ""
+        val targetBitrate = when {
+            pref.contains("96") || pref.contains("low") -> "96"
+            pref.contains("160") || pref.contains("medium") -> "160"
+            pref.contains("320") || pref.contains("high") -> "320"
+            else -> return url
+        }
+        val regex = Regex("_(320|160|96|48|12)\\.mp4(\\?.*)?$")
+        return if (regex.containsMatchIn(url)) {
+            regex.replace(url) { matchResult ->
+                val query = matchResult.groupValues[2]
+                "_${targetBitrate}.mp4$query"
+            }
+        } else {
+            url
+        }
+    }
+
+    fun toDomainSong(apiSong: ApiSong, isLiked: Boolean = false, preferredQuality: String? = null): Song {
         val primaryArtists = apiSong.artists?.primary?.mapNotNull { it.name } ?: emptyList()
         val allArtists = if (primaryArtists.isNotEmpty()) {
             primaryArtists.joinToString(", ") { unescapeHtml(it) }
@@ -96,14 +137,14 @@ object MusicUtils {
             year = apiSong.year.orEmpty(),
             language = apiSong.language.orEmpty(),
             artworkUrl = selectBestImage(apiSong.image),
-            streamUrl = selectBestAudioUrl(apiSong.downloadUrl),
+            streamUrl = selectBestAudioUrl(apiSong.downloadUrl, preferredQuality),
             hasLyrics = apiSong.hasLyrics == true,
             lyricsId = apiSong.lyricsId,
             isLiked = isLiked
         )
     }
 
-    fun toDomainAlbum(apiAlbum: ApiAlbum): Album {
+    fun toDomainAlbum(apiAlbum: ApiAlbum, preferredQuality: String? = null): Album {
         val primaryArtists = apiAlbum.artists?.primary?.mapNotNull { it.name } ?: emptyList()
         val artistName = if (primaryArtists.isNotEmpty()) {
             primaryArtists.joinToString(", ") { unescapeHtml(it) }
@@ -111,7 +152,7 @@ object MusicUtils {
             apiAlbum.artists?.all?.mapNotNull { it.name }?.joinToString(", ") { unescapeHtml(it) }
                 ?: ""
         }
-        val domainSongs = apiAlbum.songs?.map { toDomainSong(it) } ?: emptyList()
+        val domainSongs = apiAlbum.songs?.map { toDomainSong(it, preferredQuality = preferredQuality) } ?: emptyList()
         val count = apiAlbum.songCount?.toIntOrNull() ?: domainSongs.size
         return Album(
             id = apiAlbum.id,
@@ -125,8 +166,8 @@ object MusicUtils {
         )
     }
 
-    fun toDomainPlaylist(apiPlaylist: ApiPlaylist): Playlist {
-        val domainSongs = apiPlaylist.songs?.map { toDomainSong(it) } ?: emptyList()
+    fun toDomainPlaylist(apiPlaylist: ApiPlaylist, preferredQuality: String? = null): Playlist {
+        val domainSongs = apiPlaylist.songs?.map { toDomainSong(it, preferredQuality = preferredQuality) } ?: emptyList()
         val count = apiPlaylist.songCount?.toIntOrNull() ?: domainSongs.size
         return Playlist(
             id = apiPlaylist.id,

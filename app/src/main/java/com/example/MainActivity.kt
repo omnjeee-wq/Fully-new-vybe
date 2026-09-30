@@ -11,12 +11,16 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -29,6 +33,7 @@ import com.example.ui.navigation.MainAppScaffold
 import com.example.ui.search.SearchViewModel
 import com.example.ui.settings.SettingsViewModel
 import com.example.ui.theme.VybeBlack
+import com.example.ui.theme.VybeOrange
 import com.example.ui.theme.VybeTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -97,13 +102,31 @@ class MainActivity : ComponentActivity() {
         val app = VybeApp.instance
 
         setContent {
-    val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
-    val dynamicTheme by settingsViewModel.dynamicTheme.collectAsStateWithLifecycle()
+            val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
+            val accentColorHex by settingsViewModel.accentColor.collectAsStateWithLifecycle()
+            val dynamicTheme by settingsViewModel.dynamicTheme.collectAsStateWithLifecycle()
 
-    VybeTheme(themeMode = themeMode) {
-        val shouldOpenPlayer by openPlayerTrigger.collectAsStateWithLifecycle()
+            val isDark = when (themeMode) {
+                "Light" -> false
+                "Dark" -> true
+                else -> isSystemInDarkTheme()
+            }
+            val accentColor = remember(accentColorHex) {
+                try {
+                    Color(android.graphics.Color.parseColor(accentColorHex))
+                } catch (_: Exception) {
+                    VybeOrange
+                }
+            }
 
-        
+            VybeTheme(
+                darkTheme = isDark,
+                accentColor = accentColor,
+                dynamicColor = dynamicTheme
+            ) {
+                val shouldOpenPlayer by openPlayerTrigger.collectAsStateWithLifecycle()
+
+                // Request notification permission on Android 13+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     val permissionLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.RequestPermission()
@@ -123,8 +146,8 @@ class MainActivity : ComponentActivity() {
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(VybeBlack),
-                    color = VybeBlack
+                        .background(MaterialTheme.colorScheme.background),
+                    color = MaterialTheme.colorScheme.background
                 ) {
                     MainAppScaffold(
                         homeViewModel = homeViewModel,
