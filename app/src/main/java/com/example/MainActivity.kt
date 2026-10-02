@@ -88,7 +88,8 @@ class MainActivity : ComponentActivity() {
                 return SettingsViewModel(
                     driveManager = app.driveManager,
                     songDao = app.database.songDao(),
-                    appContext = applicationContext
+                    appContext = applicationContext,
+                    playerManager = app.playerManager
                 ) as T
             }
         })[SettingsViewModel::class.java]
