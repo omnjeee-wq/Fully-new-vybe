@@ -17,6 +17,7 @@ import com.example.data.local.SongDao
 import com.example.data.remote.RetrofitClient
 import com.example.domain.repository.MusicRepository
 import com.example.player.EqualizerManager
+import com.example.player.PlayerManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,6 +33,7 @@ class SettingsViewModel(
     private val driveManager: GoogleDriveManager,
     private val songDao: SongDao,
     private val appContext: Context,
+    private val playerManager: PlayerManager = VybeApp.instance.playerManager,
     private val repository: MusicRepository = VybeApp.instance.repository
 ) : ViewModel() {
 
@@ -288,6 +290,9 @@ class SettingsViewModel(
     fun setStreamingQuality(quality: String) {
         _streamingQuality.value = quality
         persistPreference("pref_streaming_quality", quality)
+        // Rebuild the active Media3 queue so the new bitrate takes effect now,
+        // not only on the next song/app restart.
+        playerManager.setStreamingQuality(quality)
     }
 
     fun setEqualizerEnabled(enabled: Boolean) {
