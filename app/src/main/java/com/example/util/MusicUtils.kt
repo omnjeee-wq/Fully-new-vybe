@@ -59,44 +59,44 @@ object MusicUtils {
 
     fun selectBestAudioUrl(downloads: List<ApiDownloadItem>?, preferredQuality: String? = null): String {
         if (downloads.isNullOrEmpty()) return ""
-        val pref = preferredQuality?.lowercase(Locale.US) ?: ""
 
-        val selected = when {
-            pref.contains("96") || pref.contains("low") -> {
-                downloads.find { it.quality == "96kbps" }
-                    ?: downloads.find { it.quality == "160kbps" }
-                    ?: downloads.find { it.quality == "320kbps" }
+        val available = downloads
+            .filter { !it.url.isNullOrBlank() && !it.quality.isNullOrBlank() }
+            .mapNotNull { item ->
+                val bitrate = Regex("\\d+").find(item.quality!!)?.value?.toIntOrNull()
+                if (bitrate != null) bitrate to item else null
             }
-            pref.contains("160") || pref.contains("medium") -> {
-                downloads.find { it.quality == "160kbps" }
-                    ?: downloads.find { it.quality == "320kbps" }
-                    ?: downloads.find { it.quality == "96kbps" }
-            }
-            pref.contains("320") || pref.contains("high") -> {
-                downloads.find { it.quality == "320kbps" }
-                    ?: downloads.find { it.quality == "160kbps" }
-                    ?: downloads.find { it.quality == "96kbps" }
-            }
-            else -> {
-                downloads.find { it.quality == "320kbps" }
-                    ?: downloads.find { it.quality == "160kbps" }
-                    ?: downloads.find { it.quality == "96kbps" }
-            }
+            .sortedBy { it.first }
+
+        if (available.isEmpty()) {
+            return downloads.lastOrNull { !it.url.isNullOrBlank() }?.url.orEmpty()
         }
 
-        val rawUrl = selected?.url ?: downloads.lastOrNull { !it.url.isNullOrBlank() }?.url.orEmpty()
-        return applyQualityToUrl(rawUrl, preferredQuality)
+        val pref = preferredQuality?.lowercase(Locale.US).orEmpty()
+        val target = Regex("\\d+").find(pref)?.value?.toIntOrNull()
+
+        val selected = when {
+            target != null -> {
+                // Prefer the exact API-provided bitrate. If it is unavailable,
+                // use the nearest higher bitrate, then the highest available.
+                available.firstOrNull { it.first == target }
+                    ?: available.firstOrNull { it.first > target }
+                    ?: available.lastOrNull()
+            }
+            pref.contains("auto") || pref.isBlank() -> available.lastOrNull()
+            else -> available.lastOrNull()
+        }
+
+        return selected?.second?.url.orEmpty()
     }
 
     fun applyQualityToUrl(url: String, preferredQuality: String?): String {
         if (url.isBlank() || url.startsWith("file://") || url.startsWith("/")) return url
-        val pref = preferredQuality?.lowercase(Locale.US) ?: ""
-        val targetBitrate = when {
-            pref.contains("96") || pref.contains("low") -> "96"
-            pref.contains("160") || pref.contains("medium") -> "160"
-            pref.contains("320") || pref.contains("high") -> "320"
-            else -> return url
-        }
+
+        val pref = preferredQuality?.lowercase(Locale.US).orEmpty()
+        val targetBitrate = Regex("\\d+").find(pref)?.value
+            ?: if (pref.contains("auto")) "320" else return url
+
         val regex = Regex("_(320|160|96|48|12)\\.mp4(\\?.*)?$")
         return if (regex.containsMatchIn(url)) {
             regex.replace(url) { matchResult ->
