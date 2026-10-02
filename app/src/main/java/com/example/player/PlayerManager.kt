@@ -95,6 +95,37 @@ class PlayerManager private constructor(
     init {
         restoreSavedState()
         connectToService()
+        scope.launch(Dispatchers.IO) {
+            currentStreamingQuality = VybeApp.instance.database.songDao()
+                .getPreference("pref_streaming_quality") ?: DEFAULT_STREAMING_QUALITY
+        }
+    }
+
+    /**
+     * Changes the actual stream URL of the currently loaded queue.
+     * Merely saving the setting is not enough because Media3 keeps the old
+     * MediaItems/URLs in the player until they are replaced.
+     */
+    fun setStreamingQuality(quality: String) {
+        currentStreamingQuality = quality
+
+        scope.launch {
+            val ctrl = controller ?: return@launch
+            if (ctrl.mediaItemCount == 0) return@launch
+
+            val state = _playerState.value
+            val queue = state.queue
+            if (queue.isEmpty()) return@launch
+
+            val currentIndex = ctrl.currentMediaItemIndex.coerceIn(0, queue.lastIndex)
+            val currentPosition = ctrl.currentPosition.coerceAtLeast(0L)
+            val wasPlaying = ctrl.isPlaying
+            val mediaItems = queue.map { it.toMediaItem(quality) }
+
+            ctrl.setMediaItems(mediaItems, currentIndex, currentPosition)
+            ctrl.prepare()
+            if (wasPlaying) ctrl.play() else ctrl.pause()
+        }
     }
 
     private fun restoreSavedState() {
@@ -686,8 +717,15 @@ class PlayerManager private constructor(
     }
 
     companion object {
+        const val DEFAULT_STREAMING_QUALITY = "High (320 kbps)"
+
+        @Volatile
+        private var currentStreamingQuality: String = DEFAULT_STREAMING_QUALITY
+
         @Volatile
         private var INSTANCE: PlayerManager? = null
+
+        fun getCurrentStreamingQuality(): String = currentStreamingQuality
 
         fun initialize(context: Context, repository: MusicRepository): PlayerManager {
             return INSTANCE ?: synchronized(this) {
@@ -728,6 +766,8 @@ fun Song.toMediaItem(preferredQuality: String? = null): MediaItem {
         })
         .build()
 
+    val effectiveQuality = preferredQuality ?: PlayerManager.getCurrentStreamingQuality()
+
     val playableUri = if (streamUrl.startsWith("file://") || streamUrl.startsWith("/")) {
         Uri.parse(streamUrl)
     } else {
@@ -735,11 +775,7 @@ fun Song.toMediaItem(preferredQuality: String? = null): MediaItem {
         if (localFile.exists() && localFile.length() > 0) {
             Uri.fromFile(localFile)
         } else {
-            val resolvedUrl = if (preferredQuality != null) {
-                com.example.util.MusicUtils.applyQualityToUrl(streamUrl, preferredQuality)
-            } else {
-                streamUrl
-            }
+            val resolvedUrl = com.example.util.MusicUtils.applyQualityToUrl(streamUrl, effectiveQuality)
             Uri.parse(resolvedUrl)
         }
     }
