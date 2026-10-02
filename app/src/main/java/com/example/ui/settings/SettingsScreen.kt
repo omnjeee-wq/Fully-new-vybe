@@ -467,7 +467,7 @@ fun SettingsScreen(
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = "User data is stored on the user's device.",
+                                    text = "User data is stored on the user's device."
                                     color = VybeTextMuted,
                                     fontSize = 11.sp,
                                     maxLines = 1,
@@ -832,6 +832,8 @@ fun SettingsScreen(
     if (showQualityDialog) {
         val qualityOptions = listOf(
             "Auto",
+            "Ultra Low (12 kbps)",
+            "Very Low (48 kbps)",
             "Low (96 kbps)",
             "Medium (160 kbps)",
             "High (320 kbps)"
@@ -851,9 +853,11 @@ fun SettingsScreen(
     // Download Quality Dialog
     if (showDownloadQualityDialog) {
         val downloadQualityOptions = listOf(
-            "High (320 kbps)",
+            "Ultra Low (12 kbps)",
+            "Very Low (48 kbps)",
+            "Low (96 kbps)",
             "Medium (160 kbps)",
-            "Low (96 kbps)"
+            "High (320 kbps)"
         )
         SelectionDialog(
             title = "Download Audio Quality",
