@@ -150,18 +150,40 @@ class MainActivity : ComponentActivity() {
                         .background(MaterialTheme.colorScheme.background),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainAppScaffold(
-                        homeViewModel = homeViewModel,
-                        searchViewModel = searchViewModel,
-                        libraryViewModel = libraryViewModel,
-                        settingsViewModel = settingsViewModel,
-                        playerManager = app.playerManager,
-                        initialOpenPlayer = shouldOpenPlayer,
-                        onPlayerOpenedHandled = { openPlayerTrigger.value = false }
-                    )
+                    val updateState by app.updateManager.updateState.collectAsStateWithLifecycle()
+
+                    when (val currentUpdateState = updateState) {
+                        is com.example.data.update.UpdateState.MandatoryUpdateRequired -> {
+                            com.example.ui.update.MandatoryUpdateScreen(
+                                state = currentUpdateState,
+                                onUpdateClick = {
+                                    app.updateManager.openOfficialTelegram(this@MainActivity)
+                                },
+                                onCheckAgainClick = {
+                                    app.updateManager.checkForUpdates(isResume = true)
+                                }
+                            )
+                        }
+                        else -> {
+                            MainAppScaffold(
+                                homeViewModel = homeViewModel,
+                                searchViewModel = searchViewModel,
+                                libraryViewModel = libraryViewModel,
+                                settingsViewModel = settingsViewModel,
+                                playerManager = app.playerManager,
+                                initialOpenPlayer = shouldOpenPlayer,
+                                onPlayerOpenedHandled = { openPlayerTrigger.value = false }
+                            )
+                        }
+                    }
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        VybeApp.instance.updateManager.checkForUpdates(isResume = true)
     }
 
     override fun onNewIntent(intent: Intent) {

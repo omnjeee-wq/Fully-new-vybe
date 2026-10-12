@@ -1,0 +1,27 @@
+{
+  "$schema-description": "VYBE App Update and Remote Configuration Control File",
+  "schema_version": 1,
+  "enabled": true,
+  "update_mode": "none",
+  "latest_release_version": "1.0.0",
+  "minimum_supported_version": "1.0.0",
+  "config_version": 1,
+  "release_notes": "VYBE v1.0.0: Initial stable release with responsive Hero Banner and hardened application security.",
+  "config_url": "https://raw.githubusercontent.com/VyomaOfficial/vybe/main/config/app-update.json",
+  "remote_config": {
+    "custom_api_base_url": null,
+    "announcement_banner": {
+      "id": "welcome_v1",
+      "message": "Welcome to VYBE! Stream high-fidelity music anytime.",
+      "type": "info",
+      "action_url": null,
+      "enabled": false
+    },
+    "feature_flags": {
+      "enable_high_res_audio": true,
+      "enable_drive_cloud_sync": true,
+      "enable_smart_recommendations": true,
+      "enable_lyrics": true
+    }
+  }
+}

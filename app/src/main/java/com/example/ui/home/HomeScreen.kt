@@ -126,11 +126,22 @@ fun HomeScreen(
                     Text("Retry", fontWeight = FontWeight.Bold)
                 }
             }
-        } else {
+            val announcementBanner by com.example.VybeApp.instance.updateManager.announcementBanner.collectAsStateWithLifecycle()
+
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 120.dp) // Room for floating bar & mini player
             ) {
+                // Remote Announcement Banner (from silent config update)
+                announcementBanner?.let { banner ->
+                    item(key = "announcement_banner_${banner.id}") {
+                        com.example.ui.components.AnnouncementBanner(
+                            banner = banner,
+                            onDismiss = { com.example.VybeApp.instance.updateManager.dismissAnnouncement() }
+                        )
+                    }
+                }
+
                 // Cinematic Hero Banner (Positioned edge-to-edge at the very top)
                 item(key = "hero_banner") {
                     val isHeroCurrent = playerState.currentSong?.id == uiState.heroSong?.id

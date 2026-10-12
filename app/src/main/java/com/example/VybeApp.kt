@@ -30,6 +30,9 @@ class VybeApp : Application() {
     lateinit var driveManager: GoogleDriveManager
         private set
 
+    lateinit var updateManager: com.example.data.update.UpdateManager
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -38,6 +41,7 @@ class VybeApp : Application() {
         repository = MusicRepositoryImpl(RetrofitClient.apiService, database.songDao())
         recommendationEngine = RecommendationEngine(repository, database.songDao())
         playerManager = PlayerManager.initialize(this, repository)
+        updateManager = com.example.data.update.UpdateManager(this)
         driveManager = GoogleDriveManager(
             context = this,
             database = database,

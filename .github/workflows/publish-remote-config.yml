@@ -1,0 +1,146 @@
+name: Publish Remote App Config
+
+on:
+  workflow_dispatch:
+    inputs:
+      update_mode:
+        description: 'Update Mode (none, silent_config, or mandatory)'
+        required: true
+        type: choice
+        default: 'silent_config'
+        options:
+          - 'none'
+          - 'silent_config'
+          - 'mandatory'
+      latest_release_version:
+        description: 'Latest Release Version (e.g. 1.1.0)'
+        required: true
+        type: string
+        default: '1.0.0'
+      minimum_supported_version:
+        description: 'Minimum Supported Version (Required for mandatory mode)'
+        required: true
+        type: string
+        default: '1.0.0'
+      release_notes:
+        description: 'Release Notes / Description of Changes'
+        required: false
+        type: string
+        default: 'Remote configuration updated.'
+      custom_api_base_url:
+        description: 'Custom API Base URL (HTTPS only, leave blank to keep default)'
+        required: false
+        type: string
+        default: ''
+      announcement_message:
+        description: 'Announcement Banner Message (leave blank for none)'
+        required: false
+        type: string
+        default: ''
+      announcement_type:
+        description: 'Announcement Banner Type'
+        required: false
+        type: choice
+        default: 'info'
+        options:
+          - 'info'
+          - 'warning'
+          - 'promo'
+      enable_announcement:
+        description: 'Enable Announcement Banner'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  update-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Update config/app-update.json
+        run: |
+          python3 - << 'EOF'
+          import json
+          import os
+
+          config_path = "config/app-update.json"
+          if os.path.exists(config_path):
+              with open(config_path, "r", encoding="utf-8") as f:
+                  data = json.load(f)
+          else:
+              data = {}
+
+          # Read inputs
+          update_mode = """${{ inputs.update_mode }}""".strip()
+          latest_version = """${{ inputs.latest_release_version }}""".strip()
+          min_version = """${{ inputs.minimum_supported_version }}""".strip()
+          release_notes = """${{ inputs.release_notes }}""".strip()
+          custom_api = """${{ inputs.custom_api_base_url }}""".strip()
+          announcement_msg = """${{ inputs.announcement_message }}""".strip()
+          announcement_type = """${{ inputs.announcement_type }}""".strip()
+          enable_announcement = "${{ inputs.enable_announcement }}".lower() == "true"
+
+          # Increment config version monotonically
+          current_cfg_ver = data.get("config_version", 1)
+          data["schema_version"] = 1
+          data["enabled"] = True
+          data["update_mode"] = update_mode
+          data["latest_release_version"] = latest_version
+          data["minimum_supported_version"] = min_version
+          data["config_version"] = current_cfg_ver + 1
+          data["release_notes"] = release_notes
+
+          if "remote_config" not in data or not isinstance(data["remote_config"], dict):
+              data["remote_config"] = {}
+
+          if custom_api:
+              data["remote_config"]["custom_api_base_url"] = custom_api
+          else:
+              data["remote_config"]["custom_api_base_url"] = None
+
+          banner = data["remote_config"].get("announcement_banner", {})
+          banner_id = f"ann_{current_cfg_ver + 1}"
+          data["remote_config"]["announcement_banner"] = {
+              "id": banner_id,
+              "message": announcement_msg if announcement_msg else banner.get("message", ""),
+              "type": announcement_type,
+              "action_url": banner.get("action_url"),
+              "enabled": enable_announcement and bool(announcement_msg)
+          }
+
+          if "feature_flags" not in data["remote_config"]:
+              data["remote_config"]["feature_flags"] = {
+                  "enable_high_res_audio": True,
+                  "enable_drive_cloud_sync": True,
+                  "enable_smart_recommendations": True,
+                  "enable_lyrics": True
+              }
+
+          with open(config_path, "w", encoding="utf-8") as f:
+              json.dump(data, f, indent=2)
+              f.write("\n")
+          print("Successfully updated config/app-update.json")
+          EOF
+
+      - name: Validate JSON Schema
+        run: |
+          python3 -m json.tool config/app-update.json > /dev/null
+          echo "JSON syntax validated successfully."
+
+      - name: Commit and Push Changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add config/app-update.json
+          if git diff --staged --quiet; then
+            echo "No changes detected in config/app-update.json"
+          else
+            git commit -m "chore(update): publish remote configuration (mode: ${{ inputs.update_mode }})"
+            git push
+            echo "Published updated configuration without rebuilding APK."
+          fi

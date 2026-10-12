@@ -26,6 +26,7 @@
 -keep class * extends com.squareup.moshi.JsonAdapter { *; }
 -keep class com.example.data.model.** { *; }
 -keep class com.example.data.drive.** { *; }
+-keep class com.example.data.update.** { *; }
 -keep class com.example.domain.model.** { *; }
 -dontwarn com.squareup.moshi.**
 
