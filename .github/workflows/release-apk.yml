@@ -44,31 +44,33 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Configure Keystore for Release Signing
+     - name: Configure Keystore for Release Signing
         env:
           KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
           KEYSTORE_PASS: ${{ secrets.STORE_PASSWORD }}
           KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+        shell: bash
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "Decoding release keystore from secrets..."
-            echo "$KEYSTORE_BASE64" | base64 --decode > my-upload-key.jks
-            echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/my-upload-key.jks" >> $GITHUB_ENV
-            echo "STORE_PASSWORD=$KEYSTORE_PASS" >> $GITHUB_ENV
-            echo "KEY_PASSWORD=$KEY_PASS" >> $GITHUB_ENV
-          elif [ -f "debug.keystore.base64" ]; then
-            echo "Using base64 keystore placeholder for CI build..."
-            base64 --decode debug.keystore.base64 > my-upload-key.jks || true
-            echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/my-upload-key.jks" >> $GITHUB_ENV
-            echo "STORE_PASSWORD=android" >> $GITHUB_ENV
-            echo "KEY_PASSWORD=android" >> $GITHUB_ENV
-          else
-            echo "Generating build keystore for signing release artifact..."
-            keytool -genkeypair -v -keystore my-upload-key.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=VYBE Release,O=Vyoma,C=US"
-            echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/my-upload-key.jks" >> $GITHUB_ENV
-            echo "STORE_PASSWORD=android" >> $GITHUB_ENV
-            echo "KEY_PASSWORD=android" >> $GITHUB_ENV
+          set -euo pipefail
+
+          if [[ -z "$KEYSTORE_BASE64" ||
+                -z "$KEYSTORE_PASS" ||
+                -z "$KEY_PASS" ]]; then
+            echo "ERROR: Release signing secrets are missing."
+            exit 1
           fi
+
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > my-upload-key.jks
+
+          keytool -list \
+            -keystore my-upload-key.jks \
+            -storepass "$KEYSTORE_PASS" \
+            -alias upload >/dev/null
+
+          echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/my-upload-key.jks" >> "$GITHUB_ENV"
+          echo "STORE_PASSWORD=$KEYSTORE_PASS" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$KEY_PASS" >> "$GITHUB_ENV"
+         
 
       - name: Build Signed Release APK (R8 Minified)
         run: gradle assembleRelease
