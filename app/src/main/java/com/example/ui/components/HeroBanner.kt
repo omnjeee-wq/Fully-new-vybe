@@ -18,6 +18,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -55,12 +57,13 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.Coil
@@ -73,7 +76,6 @@ import com.example.ui.theme.OutfitFontFamily
 import com.example.ui.theme.PlayfairFontFamily
 import com.example.ui.theme.VybeBlack
 import com.example.ui.theme.VybeElectricCyan
-import com.example.ui.theme.VybePink
 import com.example.ui.theme.neonGlow
 import com.example.ui.theme.pulsingGlow
 import kotlinx.coroutines.Dispatchers
@@ -107,10 +109,6 @@ fun HeroBanner(
     val context = LocalContext.current
 
     val artistName = heroSong?.artist?.ifBlank { "TOP ARTIST" } ?: "TOP ARTIST"
-
-    // The current Song model exposes artworkUrl.
-    // Keep the existing backend/model untouched.
-    // The artwork is also used as the circular disc centre image.
     val artistImageUrl = heroSong?.artworkUrl
 
     val fallbackTheme = remember(heroSong?.id) {
@@ -122,7 +120,7 @@ fun HeroBanner(
         mutableStateOf(fallbackTheme)
     }
 
-    // Theme is extracted from the ARTIST photo, not the song thumbnail.
+    // Theme is extracted from the artist photo, not just a static placeholder.
     LaunchedEffect(artistImageUrl) {
         if (!artistImageUrl.isNullOrBlank()) {
             targetThemeColor = extractVibrantColorFromArtwork(
@@ -141,7 +139,7 @@ fun HeroBanner(
         label = "hero_artist_theme"
     )
 
-    // Continuous vinyl rotation.
+    // Continuous smooth vinyl rotation.
     val rotationTransition = rememberInfiniteTransition(label = "vinyl_rotation")
     val vinylRotation by rotationTransition.animateFloat(
         initialValue = 0f,
@@ -156,426 +154,560 @@ fun HeroBanner(
         label = "vinyl_rotation_angle"
     )
 
-    Column(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .testTag("hero_banner")
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(360.dp)
-                .clipToBounds()
-        ) {
+        val availableWidth = maxWidth
 
-            // --------------------------------------------------------
-            // 1. SONG THUMBNAIL = FULL BLEED BLURRED BACKGROUND
-            // --------------------------------------------------------
-            if (heroSong != null && heroSong.artworkUrl.isNotBlank()) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(heroSong.artworkUrl)
-                        .crossfade(true)
-                        .size(768, 768)
-                        .build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    alignment = Alignment.Center,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .scale(1.18f)
-                        .blur(28.dp)
-                )
+        // Adaptive breakpoint determinations
+        val isCompactNarrow = availableWidth < 360.dp
+        val isCompact = availableWidth < 430.dp
+        val isMedium = availableWidth < 600.dp
+        val isExpanded = availableWidth < 840.dp
 
-                // Dark cinematic layer.
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.30f))
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(
-                                    Color(0xFF26182B),
-                                    VybeBlack
-                                ),
-                                radius = 700f
-                            )
-                        )
-                )
-            }
+        // 1. Adaptive Banner Height:
+        // Scales proportionally to available width so compact screens are not overwhelmed
+        // and tablets have generous cinematic visual impact.
+        val bannerHeight = when {
+            isCompactNarrow -> 310.dp
+            isCompact -> 345.dp
+            isMedium -> 365.dp
+            isExpanded -> 385.dp
+            else -> 415.dp
+        }
 
-            // Artist-colour ambient wash.
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                themeColor.copy(alpha = 0.26f),
-                                Color.Transparent
-                            ),
-                            radius = 650f
-                        )
-                    )
-            )
+        // 2. Adaptive Spacing & Insets
+        val horizontalPadding = when {
+            isCompactNarrow -> 14.dp
+            isCompact -> 18.dp
+            isMedium -> 22.dp
+            isExpanded -> 28.dp
+            else -> 36.dp
+        }
 
-            // Left readability gradient.
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            0f to Color(0xD9000000),
-                            0.42f to Color(0x88000000),
-                            0.70f to Color.Transparent,
-                            1f to Color.Transparent
-                        )
-                    )
-            )
+        val verticalPadding = when {
+            isCompactNarrow -> 6.dp
+            isCompact -> 8.dp
+            else -> 10.dp
+        }
 
-            // Bottom fade.
+        // 3. Proportional Vinyl Sizing:
+        // Adapts dynamically so it never collides with or covers left-side text.
+        val discSize = when {
+            isCompactNarrow -> (availableWidth * 0.44f).coerceIn(135.dp, 155.dp)
+            isCompact -> (availableWidth * 0.46f).coerceIn(170.dp, 195.dp)
+            isMedium -> (availableWidth * 0.42f).coerceIn(200.dp, 235.dp)
+            isExpanded -> (availableWidth * 0.36f).coerceIn(240.dp, 280.dp)
+            else -> (availableWidth * 0.30f).coerceIn(280.dp, 330.dp)
+        }
+
+        val vinylEndPadding = when {
+            isCompactNarrow -> 8.dp
+            isCompact -> 12.dp
+            isMedium -> 16.dp
+            isExpanded -> 24.dp
+            else -> 36.dp
+        }
+
+        // 4. Safe Maximum Text Width:
+        // Evaluates remaining space on the left to guarantee zero overlap with the vinyl disc.
+        val safeGap = if (isCompactNarrow) 8.dp else 16.dp
+        val maxTextWidth = (availableWidth - vinylEndPadding - discSize - horizontalPadding - safeGap)
+            .coerceIn(130.dp, 580.dp)
+
+        // 5. Adaptive Typography Sizing
+        val scriptFontSize = when {
+            isCompactNarrow -> 28.sp
+            isCompact -> 36.sp
+            isMedium -> 40.sp
+            isExpanded -> 46.sp
+            else -> 52.sp
+        }
+
+        val titleFontSize = when {
+            isCompactNarrow -> 22.sp
+            isCompact -> 28.sp
+            isMedium -> 34.sp
+            isExpanded -> 40.sp
+            else -> 46.sp
+        }
+
+        val titleLineHeight = when {
+            isCompactNarrow -> 26.sp
+            isCompact -> 33.sp
+            isMedium -> 39.sp
+            isExpanded -> 46.sp
+            else -> 52.sp
+        }
+
+        val artistFontSize = when {
+            isCompactNarrow -> 12.sp
+            isCompact -> 13.sp
+            isMedium -> 14.sp
+            else -> 15.sp
+        }
+
+        // 6. Adaptive Play Button Sizing
+        val playButtonHorizontalPadding = if (isCompactNarrow) 16.dp else if (isCompact) 20.dp else 24.dp
+        val playButtonVerticalPadding = if (isCompactNarrow) 8.dp else 10.dp
+        val playButtonIconSize = if (isCompactNarrow) 16.dp else 18.dp
+        val playButtonFontSize = if (isCompactNarrow) 12.sp else 13.sp
+
+        // 7. Adaptive Top Bar Sizing
+        val logoSize = if (isCompactNarrow) 28.dp else if (isCompact) 32.dp else 38.dp
+        val logoInnerSize = if (isCompactNarrow) 38.dp else if (isCompact) 42.dp else 48.dp
+        val vybeTitleFontSize = if (isCompactNarrow) 22.sp else if (isCompact) 25.sp else 28.sp
+        val shareButtonSize = if (isCompactNarrow) 34.dp else 38.dp
+        val shareIconSize = if (isCompactNarrow) 16.dp else 19.dp
+
+        // 8. Vinyl Internal Components Proportional Dimensions
+        val outerVinylSize = discSize * 0.93f
+        val discGlowSize = discSize * 0.97f
+        val discGlowRadius = (discSize * 0.18f).coerceIn(22.dp, 54.dp)
+        val artistCenterSize = (discSize * 0.41f).coerceIn(56.dp, 135.dp)
+        val centerHoleSize = (discSize * 0.045f).coerceIn(6.dp, 14.dp)
+        val centerGlowRadius = (discSize * 0.07f).coerceIn(8.dp, 20.dp)
+
+        // 9. Adaptive Bottom Separator Height
+        val separatorHeight = if (isCompactNarrow) 24.dp else if (isCompact) 32.dp else 44.dp
+
+        Column(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(100.dp)
-                    .align(Alignment.BottomCenter)
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.35f to Color(0x77000000),
-                            1f to Color.Black
-                        )
-                    )
-            )
-
-            // --------------------------------------------------------
-            // 2. ROTATING VINYL + CIRCULAR ARTIST PHOTO
-            // --------------------------------------------------------
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 12.dp)
-                    .size(225.dp)
-                    .graphicsLayer {
-                        rotationZ = vinylRotation
-                    },
-                contentAlignment = Alignment.Center
+                    .height(bannerHeight)
+                    .clipToBounds()
             ) {
 
-                // Big soft glow behind the disc.
+                // --------------------------------------------------------
+                // 1. SONG THUMBNAIL = FULL BLEED BLURRED BACKGROUND
+                // --------------------------------------------------------
+                if (heroSong != null && heroSong.artworkUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(heroSong.artworkUrl)
+                            .crossfade(true)
+                            .size(768, 768)
+                            .build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        alignment = Alignment.Center,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .scale(1.18f)
+                            .blur(28.dp)
+                    )
+
+                    // Dark cinematic overlay
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.30f))
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0xFF26182B),
+                                        VybeBlack
+                                    ),
+                                    radius = 700f
+                                )
+                            )
+                    )
+                }
+
+                // Artist-color ambient wash
                 Box(
                     modifier = Modifier
-                        .size(218.dp)
-                        .neonGlow(
-                            color = themeColor,
-                            radius = 42.dp,
-                            alpha = 0.75f
-                        )
+                        .fillMaxSize()
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
-                                    themeColor.copy(alpha = 0.34f),
+                                    themeColor.copy(alpha = 0.26f),
                                     Color.Transparent
-                                )
-                            ),
-                            CircleShape
+                                ),
+                                radius = (availableWidth.value * 1.5f).coerceAtLeast(600f)
+                            )
                         )
                 )
 
-                // Outer vinyl.
+                // Left readability gradient with dynamic stop aligned to text width
+                val gradientStop1 = ((maxTextWidth / availableWidth) * 0.80f).coerceIn(0.35f, 0.55f)
+                val gradientStop2 = ((maxTextWidth / availableWidth) * 1.18f).coerceIn(0.58f, 0.85f)
                 Box(
                     modifier = Modifier
-                        .size(210.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(
-                                    Color(0xFF343434),
-                                    Color(0xFF101010),
-                                    Color.Black,
-                                    Color(0xFF181818)
-                                )
-                            )
-                        )
-                        .border(
-                            1.5.dp,
-                            themeColor.copy(alpha = 0.65f),
-                            CircleShape
-                        )
-                ) {
-                    // Vinyl grooves.
-                    for (i in 0..7) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .size((180 - i * 18).dp)
-                                .border(
-                                    1.dp,
-                                    Color.White.copy(alpha = 0.10f),
-                                    CircleShape
-                                )
-                        )
-                    }
-
-                    // Artist image in the centre.
-                    if (!artistImageUrl.isNullOrBlank()) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(artistImageUrl)
-                                .crossfade(true)
-                                .size(180, 180)
-                                .build(),
-                            contentDescription = artistName,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .size(92.dp)
-                                .clip(CircleShape)
-                                .border(
-                                    2.dp,
-                                    themeColor.copy(alpha = 0.95f),
-                                    CircleShape
-                                )
-                                .neonGlow(
-                                    color = themeColor,
-                                    radius = 16.dp,
-                                    alpha = 0.75f
-                                )
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .size(92.dp)
-                                .clip(CircleShape)
-                                .background(themeColor.copy(alpha = 0.25f))
-                        )
-                    }
-
-                    // Centre hole / subtle highlight.
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.65f))
-                            .border(
-                                1.dp,
-                                Color.White.copy(alpha = 0.25f),
-                                CircleShape
-                            )
-                    )
-                }
-            }
-
-            // --------------------------------------------------------
-            // 3. FOREGROUND UI
-            // --------------------------------------------------------
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .padding(
-                        horizontal = 20.dp,
-                        vertical = 8.dp
-                    ),
-                verticalArrangement = Arrangement.SpaceBetween,
-                horizontalAlignment = Alignment.Start
-            ) {
-
-                // TOP BAR
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .neonGlow(
-                                    color = themeColor,
-                                    radius = 10.dp,
-                                    alpha = 0.6f
-                                )
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(
-                                            VybeElectricCyan,
-                                            themeColor
-                                        )
-                                    ),
-                                    CircleShape
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.vybe_logo),
-                                contentDescription = "VYBE Logo",
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier.size(45.dp)
-                            )
-                        }
-
-                        Text(
-                            text = "VYBE",
-                            color = Color.White,
-                            fontSize = 27.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontFamily = OutfitFontFamily,
-                            letterSpacing = 1.5.sp
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { shareVybeApp(context) },
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.16f))
-                            .border(
-                                1.dp,
-                                Color.White.copy(alpha = 0.22f),
-                                CircleShape
-                            )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Share,
-                            contentDescription = "Share VYBE",
-                            tint = Color.White,
-                            modifier = Modifier.size(19.dp)
-                        )
-                    }
-                }
-
-                // ----------------------------------------------------
-                // 4. JUST VIBE + SONG NAME
-                // ----------------------------------------------------
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth(0.52f)
-                        .padding(bottom = 4.dp)
-                ) {
-                    Text(
-                        text = "Just Vibe",
-                        color = themeColor,
-                        fontSize = 42.sp,
-                        fontFamily = GreatVibesFontFamily,
-                        fontWeight = FontWeight.Normal,
-                        style = TextStyle(
-                            shadow = Shadow(
-                                color = themeColor.copy(alpha = 0.90f),
-                                blurRadius = 28f
-                            )
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(2.dp))
-
-                    Text(
-                        text = heroSong?.title?.ifBlank { "Ghera Hua" } ?: "Ghera Hua",
-                        color = Color.White,
-                        fontSize = 39.sp,
-                        fontFamily = PlayfairFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        softWrap = false,
-                        style = TextStyle(
-                            shadow = Shadow(
-                                color = themeColor.copy(alpha = 0.50f),
-                                blurRadius = 18f
-                            )
-                        )
-                    )
-                }
-
-                // ----------------------------------------------------
-                // 5. THEME-COLOURED PLAY / PAUSE BUTTON
-                // ----------------------------------------------------
-                Box(
-                    modifier = Modifier
-                        .pulsingGlow(
-                            color = themeColor,
-                            minRadius = 8.dp,
-                            maxRadius = 20.dp,
-                            cornerRadius = 24.dp
-                        )
-                        .clip(RoundedCornerShape(24.dp))
+                        .fillMaxSize()
                         .background(
                             Brush.horizontalGradient(
-                                listOf(
-                                    themeColor.copy(alpha = 0.92f),
-                                    themeColor.copy(alpha = 0.58f)
-                                )
+                                0f to Color(0xD9000000),
+                                gradientStop1 to Color(0x88000000),
+                                gradientStop2 to Color.Transparent,
+                                1f to Color.Transparent
                             )
                         )
-                        .border(
-                            1.dp,
-                            Color.White.copy(alpha = 0.38f),
-                            RoundedCornerShape(24.dp)
+                )
+
+                // Bottom fade gradient
+                val bottomFadeHeight = (bannerHeight * 0.28f).coerceIn(80.dp, 120.dp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(bottomFadeHeight)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                0f to Color.Transparent,
+                                0.35f to Color(0x77000000),
+                                1f to Color.Black
+                            )
                         )
-                        .clickable { onPlayPauseClick() }
-                        .padding(
-                            horizontal = 23.dp,
-                            vertical = 10.dp
-                        )
-                        .testTag("hero_play_button"),
+                )
+
+                // --------------------------------------------------------
+                // 2. PROPORTIONALLY SCALED ROTATING VINYL + ARTIST PHOTO
+                // --------------------------------------------------------
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = vinylEndPadding)
+                        .size(discSize)
+                        .graphicsLayer {
+                            rotationZ = vinylRotation
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+
+                    // Big soft glow behind the disc
+                    Box(
+                        modifier = Modifier
+                            .size(discGlowSize)
+                            .neonGlow(
+                                color = themeColor,
+                                radius = discGlowRadius,
+                                alpha = 0.75f
+                            )
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        themeColor.copy(alpha = 0.34f),
+                                        Color.Transparent
+                                    )
+                                ),
+                                CircleShape
+                            )
+                    )
+
+                    // Outer vinyl body
+                    Box(
+                        modifier = Modifier
+                            .size(outerVinylSize)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0xFF343434),
+                                        Color(0xFF101010),
+                                        Color.Black,
+                                        Color(0xFF181818)
+                                    )
+                                )
+                            )
+                            .border(
+                                1.5.dp,
+                                themeColor.copy(alpha = 0.65f),
+                                CircleShape
+                            )
                     ) {
-                        AnimatedContent(
-                            targetState = isPlaying,
-                            transitionSpec = {
-                                fadeIn(tween(150)) togetherWith
-                                    androidx.compose.animation.fadeOut(tween(150))
-                            },
-                            label = "hero_play_icon"
-                        ) { playing ->
-                            Icon(
-                                imageVector = if (playing) {
-                                    Icons.Default.Pause
-                                } else {
-                                    Icons.Default.PlayArrow
-                                },
-                                contentDescription = if (playing) "Pause" else "Play",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
+                        // Proportional Vinyl Grooves
+                        for (i in 0..7) {
+                            val grooveSize = outerVinylSize * (0.86f - i * 0.072f)
+                            if (grooveSize > artistCenterSize + 6.dp) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.Center)
+                                        .size(grooveSize)
+                                        .border(
+                                            1.dp,
+                                            Color.White.copy(alpha = 0.10f),
+                                            CircleShape
+                                        )
+                                )
+                            }
+                        }
+
+                        // Artist image in the center
+                        if (!artistImageUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(artistImageUrl)
+                                    .crossfade(true)
+                                    .size(240, 240)
+                                    .build(),
+                                contentDescription = artistName,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .size(artistCenterSize)
+                                    .clip(CircleShape)
+                                    .border(
+                                        2.dp,
+                                        themeColor.copy(alpha = 0.95f),
+                                        CircleShape
+                                    )
+                                    .neonGlow(
+                                        color = themeColor,
+                                        radius = centerGlowRadius,
+                                        alpha = 0.75f
+                                    )
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .size(artistCenterSize)
+                                    .clip(CircleShape)
+                                    .background(themeColor.copy(alpha = 0.25f))
                             )
                         }
 
-                        Text(
-                            text = if (isPlaying) "PAUSE" else "PLAY",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontFamily = OutfitFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.2.sp
+                        // Center spindle hole
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(centerHoleSize)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.65f))
+                                .border(
+                                    1.dp,
+                                    Color.White.copy(alpha = 0.25f),
+                                    CircleShape
+                                )
                         )
                     }
                 }
-            }
-        }
 
-        // Keep the existing clean black separator.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .background(Color.Black)
-        )
+                // --------------------------------------------------------
+                // 3. FOREGROUND CONTENT (TOP BAR, TITLES & CONTROLS)
+                // --------------------------------------------------------
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .padding(
+                            start = horizontalPadding,
+                            end = horizontalPadding,
+                            top = verticalPadding,
+                            bottom = verticalPadding + 4.dp
+                        ),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.Start
+                ) {
+
+                    // Top Bar (Branding + Share Action)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(if (isCompactNarrow) 8.dp else 10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(logoSize)
+                                    .neonGlow(
+                                        color = themeColor,
+                                        radius = if (isCompactNarrow) 8.dp else 10.dp,
+                                        alpha = 0.6f
+                                    )
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(
+                                                VybeElectricCyan,
+                                                themeColor
+                                            )
+                                        ),
+                                        CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.vybe_logo),
+                                    contentDescription = "VYBE Logo",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.size(logoInnerSize)
+                                )
+                            }
+
+                            Text(
+                                text = "VYBE",
+                                color = Color.White,
+                                fontSize = vybeTitleFontSize,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontFamily = OutfitFontFamily,
+                                letterSpacing = 1.5.sp
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { shareVybeApp(context) },
+                            modifier = Modifier
+                                .size(shareButtonSize)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.16f))
+                                .border(
+                                    1.dp,
+                                    Color.White.copy(alpha = 0.22f),
+                                    CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Share,
+                                contentDescription = "Share VYBE",
+                                tint = Color.White,
+                                modifier = Modifier.size(shareIconSize)
+                            )
+                        }
+                    }
+
+                    // Just Vibe + Song Title + Artist Metadata
+                    Column(
+                        modifier = Modifier
+                            .widthIn(max = maxTextWidth)
+                            .padding(bottom = 4.dp)
+                    ) {
+                        Text(
+                            text = "Just Vibe",
+                            color = themeColor,
+                            fontSize = scriptFontSize,
+                            fontFamily = GreatVibesFontFamily,
+                            fontWeight = FontWeight.Normal,
+                            style = TextStyle(
+                                shadow = Shadow(
+                                    color = themeColor.copy(alpha = 0.90f),
+                                    blurRadius = 28f
+                                )
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        Text(
+                            text = heroSong?.title?.ifBlank { "Ghera Hua" } ?: "Ghera Hua",
+                            color = Color.White,
+                            fontSize = titleFontSize,
+                            lineHeight = titleLineHeight,
+                            fontFamily = PlayfairFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            style = TextStyle(
+                                shadow = Shadow(
+                                    color = themeColor.copy(alpha = 0.50f),
+                                    blurRadius = 18f
+                                )
+                            )
+                        )
+
+                        if (!isCompactNarrow && artistName.isNotBlank() && artistName != "TOP ARTIST") {
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = artistName,
+                                color = Color.White.copy(alpha = 0.75f),
+                                fontSize = artistFontSize,
+                                fontFamily = OutfitFontFamily,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    // Play / Pause Button with Touch Accessibility Target
+                    Box(
+                        modifier = Modifier
+                            .pulsingGlow(
+                                color = themeColor,
+                                minRadius = 8.dp,
+                                maxRadius = 20.dp,
+                                cornerRadius = 24.dp
+                            )
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(
+                                        themeColor.copy(alpha = 0.92f),
+                                        themeColor.copy(alpha = 0.58f)
+                                    )
+                                )
+                            )
+                            .border(
+                                1.dp,
+                                Color.White.copy(alpha = 0.38f),
+                                RoundedCornerShape(24.dp)
+                            )
+                            .clickable { onPlayPauseClick() }
+                            .padding(
+                                horizontal = playButtonHorizontalPadding,
+                                vertical = playButtonVerticalPadding
+                            )
+                            .testTag("hero_play_button"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            AnimatedContent(
+                                targetState = isPlaying,
+                                transitionSpec = {
+                                    fadeIn(tween(150)) togetherWith
+                                        androidx.compose.animation.fadeOut(tween(150))
+                                },
+                                label = "hero_play_icon"
+                            ) { playing ->
+                                Icon(
+                                    imageVector = if (playing) {
+                                        Icons.Default.Pause
+                                    } else {
+                                        Icons.Default.PlayArrow
+                                    },
+                                    contentDescription = if (playing) "Pause" else "Play",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(playButtonIconSize)
+                                )
+                            }
+
+                            Text(
+                                text = if (isPlaying) "PAUSE" else "PLAY",
+                                color = Color.White,
+                                fontSize = playButtonFontSize,
+                                fontFamily = OutfitFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.2.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Clean bottom separator
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(separatorHeight)
+                    .background(Color.Black)
+            )
+        }
     }
 }
 
